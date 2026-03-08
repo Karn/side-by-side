@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Side-by-Side Video Comparison</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="topbar-container">
+<div class="toolbar">
+  <div class="toolbar-group">
+    <select id="layout-frame-select" title="Frame style">
+      <option value="none" selected>No Frame</option>
+      <option value="phone">Phone</option>
+      <option value="app">App</option>
+    </select>
+    <button id="btn-bg" title="Set background image">Background</button>
+    <input type="file" id="layout-bg-input" accept="image/*" class="toolbar-hidden-input">
+  </div>
+  <div class="toolbar-group">
+    <button id="btn-title">Title</button>
+    <button id="btn-subtitle">Subtitle</button>
+  </div>
+</div>
+<div class="app-logo">
+  <span class="logo-icon">□■</span>
+  <span class="logo-text">SIDE-BY-SIDE</span>
+</div>
+</div>
+
+<div class="stage">
+  <div class="canvas" id="canvas">
+    <div class="canvas-vpad-handle canvas-vpad-top"><div class="drag-grip"></div></div>
+    <div class="canvas-middle">
+    <div class="canvas-hpad-handle canvas-hpad-left"><div class="drag-grip"></div></div>
+    <div class="panel-slot active" id="panel-left" tabindex="0">
+      <div class="drop-zone">
+        <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="6" y="10" width="36" height="28" rx="3"/>
+          <polygon points="20,17 20,31 32,24"/>
+        </svg>
+        <div class="drop-label">Drop video</div>
+        <div class="drop-formats">MP4, WebM, MOV</div>
+        <input type="file" accept="video/*">
+      </div>
+      <div class="panel-content">
+        <div class="panel-label hidden">
+          <input type="text" class="label-title-input hidden" placeholder="Before">
+          <input type="text" class="label-subtitle-input hidden" placeholder="Add subtitle...">
+        </div>
+        <div class="video-sizer">
+          <div class="video-player-frame">
+            <div class="app-titlebar">
+              <div class="app-titlebar-dots">
+                <span class="dot dot-close"></span>
+                <span class="dot dot-minimize"></span>
+                <span class="dot dot-maximize"></span>
+              </div>
+              <span class="app-titlebar-title"></span>
+            </div>
+            <div class="video-frame"><canvas></canvas></div>
+            <div class="timeline-bar empty" id="timeline-left">
+              <div class="timeline-lane">
+                <div class="lane-range"></div>
+                <div class="range-handle range-in"><span class="range-tooltip"></span></div>
+                <div class="range-handle range-out"><span class="range-tooltip"></span></div>
+                <div class="lane-playhead"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="panel-divider" id="panel-divider">
+      <div class="divider-handle"><div class="drag-grip"></div></div>
+    </div>
+    <div class="panel-slot" id="panel-right" tabindex="0">
+      <div class="drop-zone">
+        <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="6" y="10" width="36" height="28" rx="3"/>
+          <polygon points="20,17 20,31 32,24"/>
+        </svg>
+        <div class="drop-label">Drop video</div>
+        <div class="drop-formats">MP4, WebM, MOV</div>
+        <input type="file" accept="video/*">
+      </div>
+      <div class="panel-content">
+        <div class="panel-label hidden">
+          <input type="text" class="label-title-input hidden" placeholder="After">
+          <input type="text" class="label-subtitle-input hidden" placeholder="Add subtitle...">
+        </div>
+        <div class="video-sizer">
+          <div class="video-player-frame">
+            <div class="app-titlebar">
+              <div class="app-titlebar-dots">
+                <span class="dot dot-close"></span>
+                <span class="dot dot-minimize"></span>
+                <span class="dot dot-maximize"></span>
+              </div>
+              <span class="app-titlebar-title"></span>
+            </div>
+            <div class="video-frame"><canvas></canvas></div>
+            <div class="timeline-bar empty" id="timeline-right">
+              <div class="timeline-lane">
+                <div class="lane-range"></div>
+                <div class="range-handle range-in"><span class="range-tooltip"></span></div>
+                <div class="range-handle range-out"><span class="range-tooltip"></span></div>
+                <div class="lane-playhead"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="canvas-hpad-handle canvas-hpad-right"><div class="drag-grip"></div></div>
+    </div>
+    <div class="canvas-vpad-handle canvas-vpad-bottom"><div class="drag-grip"></div></div>
+  </div>
+</div>
+
+<div class="bottombar">
+  <div class="toolbar-group">
+    <button id="btn-play">Play [Space]</button>
+    <select id="speed" title="Playback speed">
+      <option value="0.25">Speed: 0.25x</option>
+      <option value="0.5">Speed: 0.5x</option>
+      <option value="1" selected>Speed: 1x</option>
+      <option value="1.5">Speed: 1.5x</option>
+      <option value="2">Speed: 2x</option>
+    </select>
+  </div>
+  <div class="toolbar-group">
+    <button id="btn-export" title="Export trimmed clip from active panel [E]">Export [E]</button>
+  </div>
+</div>
+
+
+<div class="export-overlay hidden" id="export-overlay">
+  <div class="export-dialog">
+    <div class="export-header">
+      <span class="export-title">Exporting</span>
+    </div>
+    <div class="export-body">
+      <div class="progress-track"><div class="progress-fill"></div></div>
+      <div class="export-frames-row">
+        <span class="export-frames-current">0</span>
+        <span class="export-frames-total">0</span>
+      </div>
+      <div class="export-setting-row">
+        <span class="export-setting-label">Frame Rate</span>
+        <select class="export-format-select" id="export-fps">
+          <option value="24">24 fps</option>
+          <option value="30" selected>30 fps</option>
+          <option value="60">60 fps</option>
+        </select>
+      </div>
+      <div class="export-controls-row">
+        <select class="export-format-select" id="export-format">
+          <option value="webm" selected>WebM</option>
+          <option value="mp4">MP4</option>
+          <option value="gif">GIF</option>
+        </select>
+        <select class="export-format-select" id="export-speed">
+          <option value="0.25">0.25x</option>
+          <option value="0.5">0.5x</option>
+          <option value="1" selected>1x</option>
+          <option value="1.5">1.5x</option>
+          <option value="2">2x</option>
+        </select>
+        <button class="export-action-btn">Export</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="panel.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,752 @@
+:root {
+  /* Page */
+  --color-page-bg: #f7f7f4;
+  --color-text: #26251e;
+
+  /* Canvas */
+  --color-canvas-bg: #f2f1ed;
+  --color-canvas-border: #d0d0d0;
+
+  /* Bar (toolbar + bottombar) */
+  --color-bar-bg: #1e1e1e;
+  --color-bar-border: #2a2a2a;
+
+  /* Buttons */
+  --color-btn-bg: #e6e5e0;
+  --color-btn-border: #d0d0d0;
+  --color-btn-text: #26251e;
+  --color-btn-hover-bg: #dddcd7;
+  --color-btn-hover-text: #333;
+  --color-btn-active-bg: #d5d4cf;
+  --color-btn-on-bg: #d5d4cf;
+  --color-btn-on-border: #bbb;
+  --color-btn-on-text: #333;
+
+  /* Inputs (selects, number inputs) */
+  --color-input-bg: #e6e5e0;
+  --color-input-border: #d0d0d0;
+  --color-input-text: #555;
+
+  /* Accent */
+  --color-accent-primary: #ffb615;
+  --color-accent-secondary: #402f15;
+
+  /* Range */
+  --color-range: #f5a623;
+
+  /* Panel */
+  --color-panel-bg: #fff;
+  --color-panel-shadow: rgba(0,0,0,0.06);
+
+  /* Phone frame */
+  --color-phone-border: #c0bbb5;
+
+  /* Grip handles */
+  --color-grip: #ccc;
+
+  /* Timeline */
+  --color-timeline-bg: #26251e;
+  --color-lane-bg: #252525;
+
+  /* Tooltip */
+  --color-tooltip-bg: #2a2a2a;
+  --color-tooltip-border: #444;
+  --color-tooltip-text: #ddd;
+
+  /* Drop zone */
+  --color-drop-icon: #d0d0d0;
+  --color-drop-label: #aaa;
+  --color-drop-formats: #ccc;
+
+  /* Labels */
+  --color-label-title: #333;
+  --color-label-subtitle: #888;
+  --color-label-placeholder: #ccc;
+
+  /* Radius */
+  --button-radius: 4px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--color-page-bg);
+  color: var(--color-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* ── Top bar container (logo / toolbar swap) ── */
+.topbar-container {
+  display: grid;
+  flex-shrink: 0;
+}
+
+.topbar-container > * {
+  grid-area: 1 / 1;
+}
+
+.app-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 8px;
+  margin: 8px auto 0;
+  z-index: 0;
+}
+
+.logo-icon {
+  font-size: 16px;
+  letter-spacing: -1px;
+  color: var(--color-btn-text);
+}
+
+.logo-text {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--color-btn-text);
+}
+
+.toolbar:not(.hidden) + .app-logo {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* ── Toolbar / Bottombar shared ── */
+.toolbar.hidden, .bottombar.hidden { visibility: hidden; pointer-events: none; }
+
+.toolbar, .bottombar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: transparent;
+  border: none;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+/* ── Toolbar ── */
+.toolbar {
+  margin: 8px auto 0;
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 2px;
+}
+
+/* ── Bottombar ── */
+.bottombar {
+  margin: 0 auto 8px;
+}
+
+/* ── Shared control styles (buttons, selects, inputs) ── */
+button, select, input[type="number"] {
+  font-size: 10px;
+  padding: 8px 16px;
+  background: var(--color-btn-bg);
+  border: none;
+  color: var(--color-btn-text);
+  border-radius: var(--button-radius);
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+button:hover:not(:disabled),
+select:hover:not(:disabled),
+input[type="number"]:hover:not(:disabled) {
+  background-color: var(--color-btn-hover-bg);
+  color: var(--color-btn-hover-text);
+}
+
+button:active:not(:disabled),
+select:active:not(:disabled),
+input[type="number"]:active:not(:disabled) {
+  background-color: var(--color-btn-active-bg);
+}
+
+button.on { background: var(--color-btn-on-bg); border-color: var(--color-btn-on-border); color: var(--color-btn-on-text); }
+
+button:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--color-btn-text);
+  outline-offset: 1px;
+}
+
+button:disabled, select:disabled { opacity: 0.5; cursor: default; }
+
+select {
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='%2326251e' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 24px;
+}
+
+.toolbar input[type="number"] { width: 60px; font-variant-numeric: tabular-nums; }
+.toolbar .lbl { font-size: 11px; color: #555; margin-right: 2px; }
+
+/* ── Stage (viewport area) ── */
+.stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  padding: 8px;
+}
+
+/* ── Canvas (export surface) ── */
+.canvas {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-canvas-bg);
+  border: none;
+  border-radius: 0;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.04);
+  padding: 0;
+  max-width: 100%;
+  max-height: 100%;
+  /* sized by JS to maintain 16:9 */
+}
+
+/* ── Canvas middle row (content between vertical padding) ── */
+.canvas-middle {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  align-items: stretch;
+}
+
+/* ── Canvas vertical padding (structural) ── */
+.canvas-vpad-handle {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: row-resize;
+  z-index: 15;
+  /* height set by JS */
+}
+
+/* ── Shared drag grip ── */
+.drag-grip {
+  background: var(--color-grip);
+  border-radius: 2px;
+  transition: background 0.1s, width 0.1s, height 0.1s;
+}
+
+.canvas-vpad-handle .drag-grip { width: 20px; height: 4px; opacity: 0; transition: background 0.1s, width 0.1s, opacity 0.2s; }
+.canvas:hover .canvas-vpad-handle .drag-grip { opacity: 1; }
+.canvas-vpad-handle:hover .drag-grip { background: var(--color-accent-secondary); width: 28px; }
+
+/* ── Canvas horizontal padding (structural) ── */
+.canvas-hpad-handle {
+  flex-shrink: 0;
+  min-width: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: col-resize;
+  z-index: 15;
+  overflow: visible;
+  /* width set by JS (min 8px for grip interactivity) */
+}
+
+.canvas-hpad-handle .drag-grip { width: 4px; height: 20px; opacity: 0; transition: background 0.1s, height 0.1s, opacity 0.2s; }
+.canvas:hover .canvas-hpad-handle .drag-grip { opacity: 1; }
+.canvas-hpad-handle:hover .drag-grip { background: var(--color-accent-secondary); height: 28px; }
+
+/* ── Panel slot (layout wrapper) ── */
+.panel-slot {
+  flex: 1;
+  align-self: stretch;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  max-height: 100%;
+  outline: none;
+}
+
+#panel-left { align-items: flex-end; }
+#panel-right { align-items: flex-start; }
+
+/* ── Panel content (label + video wrapper) ── */
+.panel-content {
+  display: none;
+  flex-direction: column;
+  height: 100%;
+  align-items: stretch;
+}
+
+.panel-content.loaded {
+  display: flex;
+}
+
+/* ── Panel label (title/subtitle above video) ── */
+.panel-label {
+  text-align: left;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.panel-label.hidden { display: none; }
+
+.label-title-input.hidden { display: none; }
+.label-subtitle-input.hidden { display: none; }
+
+.label-title-input,
+.label-subtitle-input {
+  display: block;
+  width: 100%;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: inherit;
+  padding: 0;
+  line-height: 1.4;
+}
+
+.label-title-input {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-label-title);
+}
+
+.label-subtitle-input {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-label-subtitle);
+}
+
+.label-title-input::placeholder,
+.label-subtitle-input::placeholder {
+  color: var(--color-label-placeholder);
+}
+
+/* ── Video player frame (floating card) ── */
+.video-player-frame {
+  position: relative;
+  display: none;
+  border-radius: 12px;
+  max-width: 100%;
+  max-height: 100%;
+  overflow: visible;
+}
+
+/* Outer sizer absorbs flex stretch; inner VPF wraps content naturally */
+.video-sizer {
+  flex: 1;
+  min-height: 0;
+}
+
+.video-player-frame.loaded {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: 100%;
+}
+
+
+/* ── Frame type: phone ── */
+.video-player-frame.frame-phone {
+  border: 4px solid var(--color-phone-border);
+  border-radius: 18px;
+  background: var(--color-panel-bg);
+  padding: 0;
+  overflow: hidden;
+}
+
+.video-player-frame.frame-phone .video-frame canvas {
+  border-radius: 16px;
+}
+
+/* ── Frame type: app (macOS window chrome) ── */
+.video-player-frame.frame-app {
+  border: 1px solid var(--color-canvas-border);
+  border-radius: 10px;
+  background: var(--color-panel-bg);
+  overflow: hidden;
+}
+
+.video-player-frame.frame-app .video-frame canvas {
+  border-radius: 0;
+}
+
+/* ── App title bar ── */
+.app-titlebar {
+  display: none;
+  align-items: center;
+  height: 24px;
+  padding: 0 6px;
+  border-bottom: 1px solid var(--color-canvas-border);
+  position: relative;
+}
+
+.video-player-frame.frame-app .app-titlebar {
+  display: flex;
+}
+
+.app-titlebar-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.app-titlebar-dots .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #c0bbb5;
+}
+
+.app-titlebar-title {
+  position: absolute;
+  left: 60px;
+  right: 60px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text);
+  pointer-events: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Video frame ── */
+.video-frame {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.video-frame canvas {
+  max-width: 100%;
+  max-height: var(--sizer-height, 100vh);
+  display: block;
+  border-radius: 12px;
+}
+
+/* ── Drop zone ── */
+.drop-zone {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  align-self: stretch;
+  cursor: pointer;
+  transition: background 0.15s;
+  border-radius: inherit;
+}
+
+.drop-zone:hover { background: rgba(0,0,0,0.015); }
+.drop-zone.dragover { background: rgba(78,166,247,0.06); }
+.drop-zone.hidden { display: none; }
+
+.drop-zone input[type="file"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.drop-zone svg { width: 48px; height: 48px; color: var(--color-drop-icon); margin-bottom: 14px; }
+.drop-zone .drop-label { font-size: 14px; color: var(--color-drop-label); margin-bottom: 6px; }
+.drop-zone .drop-formats { font-size: 11px; color: var(--color-drop-formats); letter-spacing: 0.02em; }
+
+/* ── Gap column (draggable divider) ── */
+.panel-divider {
+  width: 16px;
+  flex-shrink: 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+}
+
+.divider-handle {
+  position: absolute;
+  width: 14px;
+  height: 40px;
+  cursor: col-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  border-radius: 6px;
+}
+
+.divider-handle .drag-grip { width: 4px; height: 20px; opacity: 0; transition: background 0.1s, width 0.1s, height 0.1s, opacity 0.2s; }
+.canvas:hover .divider-handle .drag-grip { opacity: 1; }
+.divider-handle:hover .drag-grip { background: var(--color-accent-secondary); height: 28px; }
+.panel-divider.dragging .drag-grip { background: var(--color-accent-secondary); height: 32px; opacity: 1; }
+
+/* ── Timeline bar (inside panel) ── */
+.timeline-bar {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 32px;
+  padding: 4px;
+  background: var(--color-timeline-bg);
+  border-radius: 8px;
+  min-width: 0;
+  z-index: 6;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+
+.video-player-frame:hover .timeline-bar:not(.empty),
+.timeline-bar.dragging {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.timeline-bar.empty { display: none; }
+
+@keyframes timeline-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.timeline-bar.just-loaded {
+  animation: timeline-in 0.3s ease-out;
+}
+
+/* ── Lane (custom track) ── */
+.timeline-lane {
+  flex: 1;
+  position: relative;
+  height: 32px;
+  border-radius: 6px;
+  overflow: visible;
+  cursor: pointer;
+  min-width: 0;
+}
+
+/* ── Range highlight ── */
+.lane-range {
+  position: absolute;
+  top: 0; bottom: 0;
+  border-radius: 6px;
+  background: rgba(245,166,35,0.15);
+  pointer-events: none;
+  opacity: 1;
+  transition: background 0.15s;
+  left: 0%; width: 100%;
+}
+
+.timeline-lane .lane-range { background: rgba(245,166,35,0.25); }
+
+/* ── Range handles ── */
+.range-handle {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 14px;
+  transform: translateX(-50%);
+  z-index: 5;
+  pointer-events: auto;
+  cursor: col-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.range-handle::after {
+  content: '';
+  width: 4px;
+  border-radius: 2px;
+  background: var(--color-range);
+  opacity: 1;
+  transition: opacity 0.15s, height 0.15s;
+  height: 20px;
+}
+
+/* ── Playhead ── */
+.lane-playhead {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 2px;
+  transform: translateX(-50%);
+  background: var(--color-accent-primary);
+  box-shadow: 0 0 8px rgba(255,182,21,0.5);
+  z-index: 4;
+  pointer-events: none;
+  left: 0%;
+  transition: opacity 0.15s;
+}
+
+
+/* ── Empty state ── */
+.timeline-empty-label {
+  display: none;
+  position: absolute;
+  inset: 0;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #444;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* ── Range handle tooltip ── */
+.range-tooltip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-tooltip-bg);
+  border: 1px solid var(--color-tooltip-border);
+  color: var(--color-tooltip-text);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  padding: 3px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.range-handle.dragging .range-tooltip { opacity: 1; }
+
+/* ── Export overlay ── */
+.export-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.export-overlay.hidden { display: none; }
+
+.export-dialog {
+  background: var(--color-canvas-bg);
+  border: none;
+  border-radius: 4px;
+  min-width: 340px;
+  overflow: hidden;
+}
+
+.export-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-canvas-border);
+}
+
+.export-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.export-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.export-frames-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.export-frames-current,
+.export-frames-total {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-label-subtitle);
+}
+
+.export-setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.export-setting-label {
+  font-size: 11px;
+  color: var(--color-label-subtitle);
+}
+
+.export-controls-row {
+  display: flex;
+  gap: 4px;
+}
+
+.progress-track {
+  height: 5px;
+  background: var(--color-canvas-border);
+  border-radius: var(--button-radius);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--color-accent-primary);
+  border-radius: var(--button-radius);
+  width: 0%;
+  transition: width 0.15s;
+}
+
+.export-action-btn {
+  margin-left: auto;
+}
+
+/* ── Toolbar utilities ── */
+.toolbar-hidden-input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  overflow: hidden;
+}
+
+.toolbar-btn-small {
+  font-size: 10px;
+  padding: 8px 10px;
+  background: var(--color-btn-bg);
+  border: none;
+  color: var(--color-btn-text);
+  border-radius: var(--button-radius);
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.toolbar-btn-small:hover { background: var(--color-btn-hover-bg); color: var(--color-btn-hover-text); }
+.toolbar-btn-small:active { background: var(--color-btn-active-bg); }
+.toolbar-btn-small:focus-visible { outline: 2px solid var(--color-btn-text); outline-offset: 1px; }
