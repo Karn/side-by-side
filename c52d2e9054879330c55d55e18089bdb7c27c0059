@@ -1,0 +1,45 @@
+app.js
+  3237826ab4a6305c 3,5-13,34,42,58-215,380
+panel.js
+  3237826ab4a6305c 1-267
+style.css
+  3237826ab4a6305c 115-122,337-489
+index.html
+  deefcfee82a3f505 26
+  3237826ab4a6305c 33-73,84,109-110,115,150
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "c52d2e9054879330c55d55e18089bdb7c27c0059",
+  "prompts": {
+    "3237826ab4a6305c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "acb4e596-0f9c-4c9d-a16a-c70563df2f8e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Karn Saheb <karn@makenotion.com>",
+      "messages": [],
+      "total_additions": 799,
+      "total_deletions": 431,
+      "accepted_lines": 649,
+      "overriden_lines": 0,
+      "messages_url": "https://usegitai.com/cas/d48242531d6f548f60afbb294f0af1399f0f5f3f6ebf11dce6befd4407c0f0c4"
+    },
+    "deefcfee82a3f505": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a51144bd-ccf5-42ff-a9f7-2e5145e74bac",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Karn Saheb <karn@makenotion.com>",
+      "messages": [],
+      "total_additions": 7,
+      "total_deletions": 4,
+      "accepted_lines": 5,
+      "overriden_lines": 0,
+      "messages_url": "https://usegitai.com/cas/413749763c1ef56cbdb1114787d983c505115a21c4c02e489a81ffb8fd78fcd5"
+    }
+  }
+}
