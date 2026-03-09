@@ -1,0 +1,28 @@
+style.css
+  43685587eaf2a385 145-146,152-200
+app.js
+  43685587eaf2a385 178-181,183-186,257-283
+index.html
+  43685587eaf2a385 38-42,59-63,71,91-95,103
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "3202b10d20958fc1f4c0cc23a4e136b7aa506830",
+  "prompts": {
+    "43685587eaf2a385": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9f82f6a2-e021-48dd-b5fe-fd73532d2f63",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Karn Saheb <karn@makenotion.com>",
+      "messages": [],
+      "total_additions": 250,
+      "total_deletions": 153,
+      "accepted_lines": 105,
+      "overriden_lines": 0,
+      "messages_url": "https://usegitai.com/cas/a0373f37deaa23399ef5fc041f22cc4df248e7166ef67c0c47b61e9589e326b7"
+    }
+  }
+}
