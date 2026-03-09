@@ -1,0 +1,61 @@
+app.js
+  6d35625c9365c2d3 31-34,80-81,382-386,451-456,467-470,473,486,488-491,496,499,502,504-505
+gif-encoder.js
+  6d35625c9365c2d3 1,11,73,75-111,116,120-121,123-138,140,142-143,148-149,151,154-182
+index.html
+  018aad3692755601 11-15,31
+  6d35625c9365c2d3 36,114
+  a5cbe8562be31b08 122
+style.css
+  6d35625c9365c2d3 217,228-233,236,238,244,254-255,258,260,266-267,270-271
+  018aad3692755601 83-119
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "57c09864059f310c99893fbdc9c591d74e21dd95",
+  "prompts": {
+    "018aad3692755601": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "20b4b1bb-e3f3-430a-92ff-37cedbf60258",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Karn Saheb <karn@makenotion.com>",
+      "messages": [],
+      "total_additions": 43,
+      "total_deletions": 0,
+      "accepted_lines": 43,
+      "overriden_lines": 0,
+      "messages_url": "https://usegitai.com/cas/1c6b83eea290c7a6ec52baebd7053d1e1196bc717084f3095c13a5b7f6f1ddfa"
+    },
+    "6d35625c9365c2d3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f2141fe7-c89f-4c89-b550-b7713e887e12",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Karn Saheb <karn@makenotion.com>",
+      "messages": [],
+      "total_additions": 200,
+      "total_deletions": 205,
+      "accepted_lines": 162,
+      "overriden_lines": 0,
+      "messages_url": "https://usegitai.com/cas/2448b0f5abd8ba0f873122218c19cd8570e35d93928eed6afaae087907397224"
+    },
+    "a5cbe8562be31b08": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "880eabe6-ec29-4b9c-9e68-b6df03f2fa5d",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Karn Saheb <karn@makenotion.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 3,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "messages_url": "https://usegitai.com/cas/ae6a3e2485318c1ba27f3c03f0e6fd2f0a687420e0ee5200bc9dfe70e1d6a8f4"
+    }
+  }
+}
