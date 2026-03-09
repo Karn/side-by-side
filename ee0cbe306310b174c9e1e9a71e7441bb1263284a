@@ -1,0 +1,48 @@
+app.js
+  43685587eaf2a385 9-11,37-39,43-44,48-52,64,86-87,89-90,92-95,98-105,152-191,224
+  3237826ab4a6305c 8,17-18,21-22,26-36,40-42,47,53,85,129-130,132-133,135-136,138-139,141-142,145-148
+style.css
+  43685587eaf2a385 4,14-15,27-29,47-52,65-67,70-72,91,98,100-101,104-105,108-140,142,144-145,147,151-167,175,179-184,188-191,197,202,277,279-282,287,290-299,332,357,359,470-471,475-476,479-481,483-485,488,491
+  3237826ab4a6305c 5,86-87,90,93,96-97,102-103,106,171-172,192,216-217,220-221,231-237,243,245,257,262,271,276,288-289,300-303,308-310,420
+panel.js
+  43685587eaf2a385 12-13,24,74,85,87-88,205,210,254
+  3237826ab4a6305c 10-11,15,22-23
+index.html
+  43685587eaf2a385 17-21,24-27,31-36,42-43,54-59,61-62,69,80-82,88,92,96-109
+  3237826ab4a6305c 40-41,66-67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "ee0cbe306310b174c9e1e9a71e7441bb1263284a",
+  "prompts": {
+    "3237826ab4a6305c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "acb4e596-0f9c-4c9d-a16a-c70563df2f8e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Karn Saheb <karn@makenotion.com>",
+      "messages": [],
+      "total_additions": 235,
+      "total_deletions": 171,
+      "accepted_lines": 95,
+      "overriden_lines": 0,
+      "messages_url": "https://usegitai.com/cas/31339988e771f66363bdfb9dfb2a7f0e540dee51d97c268754e2b2db4223b02d"
+    },
+    "43685587eaf2a385": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9f82f6a2-e021-48dd-b5fe-fd73532d2f63",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Karn Saheb <karn@makenotion.com>",
+      "messages": [],
+      "total_additions": 485,
+      "total_deletions": 706,
+      "accepted_lines": 269,
+      "overriden_lines": 0,
+      "messages_url": "https://usegitai.com/cas/18d4d92ea12d29e8eca98d00b281fe47ef0c1dd3c0943d510ecbe174a383c910"
+    }
+  }
+}
