@@ -1,0 +1,24 @@
+README.md
+  0752b31f6ff89791 1-37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "fc086055bb8e697577e1741631f389eed781a447",
+  "prompts": {
+    "0752b31f6ff89791": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "249f0f7b-ea4b-4799-a491-42001b862b82",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Karn Saheb <karn@makenotion.com>",
+      "messages": [],
+      "total_additions": 56,
+      "total_deletions": 9,
+      "accepted_lines": 37,
+      "overriden_lines": 0,
+      "messages_url": "https://usegitai.com/cas/437ea0bb4f6133f684ad5a6a25bdfbdc109e5d56be83ab353564d258116b5fa8"
+    }
+  }
+}
