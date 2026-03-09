@@ -1,0 +1,22 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "aaf6e2410b4f90e0ef084d3a08296fda0d19429a",
+  "prompts": {
+    "6d35625c9365c2d3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f2141fe7-c89f-4c89-b550-b7713e887e12",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Karn Saheb <karn@makenotion.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 20,
+      "accepted_lines": 2,
+      "overriden_lines": 0,
+      "messages_url": "https://usegitai.com/cas/4df3bd03d574f6784f6f8c7f48778431dab2f524b83895a7d75a19209b0785ea"
+    }
+  }
+}
