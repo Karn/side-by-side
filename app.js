@@ -296,7 +296,7 @@ function togglePlay() {
 }
 
 function videoPanels() {
-  return [leftPanel, rightPanel].filter(p => p.loaded);
+  return [leftPanel, rightPanel].filter(p => p.loaded && p.mediaType === 'video');
 }
 
 function setPlayButtonState(isPlaying) {
