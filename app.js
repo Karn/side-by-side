@@ -376,16 +376,106 @@ function updatePanelLabelsVisibility() {
 
 // ── Export ──
 
-// One or two videos. In sequential mode, clips play one after another (left, then right)
-// instead of side by side at once — each clip freeze-frames on its first frame before its
-// turn and its last frame after.
+// Shared setup for both the still-image and video/GIF export paths: an
+// offscreen canvas at export resolution (scaled from on-screen coordinates),
+// plus the background image, panel/frame rects, labels, and colors to draw with.
+async function buildExportGeometry(panels, exportW, exportH) {
+  const oc = document.createElement('canvas');
+  oc.width = exportW;
+  oc.height = exportH;
+  const ctx = oc.getContext('2d');
+
+  const canvasRect = canvasEl.getBoundingClientRect();
+  ctx.scale(exportW / canvasRect.width, exportH / canvasRect.height);
+
+  let bgImg = null;
+  if (layoutState.bgImage) {
+    bgImg = new Image();
+    bgImg.src = layoutState.bgImage;
+    await new Promise(r => { bgImg.onload = r; });
+  }
+
+  const panelRects = panels.map(p => {
+    const r = p.canvas.getBoundingClientRect();
+    return { x: r.left - canvasRect.left, y: r.top - canvasRect.top, w: r.width, h: r.height };
+  });
+
+  const phoneBorder = 4;
+  const frameRects = panelRects.map(pr => ({
+    x: pr.x - phoneBorder,
+    y: pr.y - phoneBorder,
+    w: pr.w + phoneBorder * 2,
+    h: pr.h + phoneBorder * 2,
+  }));
+
+  const labelInfos = panels.map(p => {
+    const labelEl = p.panel.querySelector('.panel-label');
+    if (labelEl.classList.contains('hidden')) return null;
+    const titleInput = p.panel.querySelector('.label-title-input');
+    const subtitleInput = p.panel.querySelector('.label-subtitle-input');
+    const r = labelEl.getBoundingClientRect();
+    return {
+      x: r.left - canvasRect.left,
+      y: r.top - canvasRect.top,
+      title: !titleInput.classList.contains('hidden') ? titleInput.value : null,
+      subtitle: !subtitleInput.classList.contains('hidden') ? subtitleInput.value : null,
+    };
+  });
+
+  const bgColor = getComputedStyle(canvasEl).backgroundColor;
+  const phoneBorderColor = getComputedStyle(document.documentElement).getPropertyValue('--color-phone-border').trim();
+  const titleColor = getComputedStyle(document.documentElement).getPropertyValue('--color-label-title').trim();
+  const subtitleColor = getComputedStyle(document.documentElement).getPropertyValue('--color-label-subtitle').trim();
+  const font = `-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif`;
+
+  return { oc, ctx, canvasRect, bgImg, panelRects, frameRects, labelInfos, bgColor, phoneBorderColor, titleColor, subtitleColor, font };
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// A video trimmed down to (or naturally only) one frame behaves like a photo for
+// export purposes: there's nothing to play, so it should freeze-frame like one.
+function isEffectivelyStill(p) {
+  if (p.mediaType === 'image') return true;
+  const trimmed = (p.outPoint ?? p.duration) - (p.inPoint ?? 0);
+  return trimmed <= FRAME_DURATION + 0.001;
+}
+
+// One or two videos, optionally paired with a photo (which freeze-frames for the whole export).
+// In sequential mode, clips play one after another (left, then right) instead of side by side at
+// once — each clip freeze-frames on its first frame before its turn and its last frame after.
 async function exportCanvas() {
   const panels = [];
   if (leftPanel.loaded) panels.push(leftPanel);
   if (rightPanel.loaded) panels.push(rightPanel);
   if (panels.length === 0) return;
   if (playing) stopPlay();
+
+  // Nothing left to actually play (all photos, or all single-frame video) → a still image,
+  // regardless of playback mode: there's nothing to sequence between two stills.
+  if (panels.every(isEffectivelyStill)) {
+    await exportStillImage(panels);
+    return;
+  }
   await exportVideoOrGif(panels);
+}
+
+// All panels are stills (photos, and/or single-frame video): render one frame straight to a PNG.
+async function exportStillImage(panels) {
+  const { oc, ctx, canvasRect, bgImg, panelRects, frameRects, labelInfos, bgColor, phoneBorderColor, titleColor, subtitleColor, font } =
+    await buildExportGeometry(panels, 1920, 1080);
+
+  drawExportFrame(ctx, panels, panelRects, frameRects, labelInfos, bgImg, bgColor, phoneBorderColor, titleColor, subtitleColor, font, canvasRect.width, canvasRect.height);
+
+  const blob = await new Promise(resolve => oc.toBlob(resolve, 'image/png'));
+  if (blob) downloadBlob(blob, 'comparison.png');
 }
 
 async function exportVideoOrGif(panels) {
@@ -398,7 +488,7 @@ async function exportVideoOrGif(panels) {
   const formatSelect = document.getElementById('export-format');
   const fpsSelect = document.getElementById('export-fps');
 
-  const clips = panels;
+  const clips = panels.filter(p => p.mediaType === 'video');
   const clipDurations = clips.map(p => (p.outPoint ?? p.duration) - (p.inPoint ?? 0));
 
   function getSpeed() { return parseFloat(speedSel.value) || 1; }
@@ -478,60 +568,8 @@ async function exportVideoOrGif(panels) {
   const FRAME_DUR = 1 / FPS;
   const totalFrames = calcTotalFrames();
 
-  // Offscreen canvas at export resolution, with ctx.scale() so we can
-  // draw using on-screen coordinates directly — the transform handles scaling.
-  const oc = document.createElement('canvas');
-  oc.width = EXPORT_W;
-  oc.height = EXPORT_H;
-  const ctx = oc.getContext('2d');
-
-  const canvasRect = canvasEl.getBoundingClientRect();
-  const scaleX = EXPORT_W / canvasRect.width;
-  const scaleY = EXPORT_H / canvasRect.height;
-  ctx.scale(scaleX, scaleY);
-
-  // Load background image if set
-  let bgImg = null;
-  if (layoutState.bgImage) {
-    bgImg = new Image();
-    bgImg.src = layoutState.bgImage;
-    await new Promise(r => { bgImg.onload = r; });
-  }
-
-  // Read positions directly from the on-screen layout (screen pixels)
-  const panelRects = panels.map(p => {
-    const r = p.canvas.getBoundingClientRect();
-    return { x: r.left - canvasRect.left, y: r.top - canvasRect.top, w: r.width, h: r.height };
-  });
-
-  const phoneBorder = 4;
-  const frameRects = panelRects.map(pr => ({
-    x: pr.x - phoneBorder,
-    y: pr.y - phoneBorder,
-    w: pr.w + phoneBorder * 2,
-    h: pr.h + phoneBorder * 2,
-  }));
-
-  const labelInfos = panels.map(p => {
-    const labelEl = p.panel.querySelector('.panel-label');
-    if (labelEl.classList.contains('hidden')) return null;
-    const titleInput = p.panel.querySelector('.label-title-input');
-    const subtitleInput = p.panel.querySelector('.label-subtitle-input');
-    const r = labelEl.getBoundingClientRect();
-    return {
-      x: r.left - canvasRect.left,
-      y: r.top - canvasRect.top,
-      title: !titleInput.classList.contains('hidden') ? titleInput.value : null,
-      subtitle: !subtitleInput.classList.contains('hidden') ? subtitleInput.value : null,
-    };
-  });
-
-  // Read computed styles once
-  const bgColor = getComputedStyle(canvasEl).backgroundColor;
-  const phoneBorderColor = getComputedStyle(document.documentElement).getPropertyValue('--color-phone-border').trim();
-  const titleColor = getComputedStyle(document.documentElement).getPropertyValue('--color-label-title').trim();
-  const subtitleColor = getComputedStyle(document.documentElement).getPropertyValue('--color-label-subtitle').trim();
-  const font = `-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif`;
+  const { oc, ctx, canvasRect, bgImg, panelRects, frameRects, labelInfos, bgColor, phoneBorderColor, titleColor, subtitleColor, font } =
+    await buildExportGeometry(panels, EXPORT_W, EXPORT_H);
 
   // GIF: collect frames directly. Video: use MediaRecorder.
   let recorder, stream, chunks = [], stopped, mimeType;
@@ -558,7 +596,7 @@ async function exportVideoOrGif(panels) {
     framesCurrent.textContent = isGif ? `GIF ${i + 1} / ${totalFrames}` : String(i + 1);
     progressFill.style.width = ((i + 1) / totalFrames * 100) + '%';
 
-    // Seek each panel to the correct time.
+    // Seek video panels to the correct time; photo panels stay a freeze-frame throughout.
     await Promise.all(clips.map((p, idx) => {
       const start = p.inPoint ?? 0;
       const end = p.outPoint ?? p.duration;
@@ -608,14 +646,7 @@ async function exportVideoOrGif(panels) {
     overlay.classList.add('hidden');
     overlay.onclick = null;
 
-    if (blob) {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `comparison.${ext}`;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
+    if (blob) downloadBlob(blob, `comparison.${ext}`);
   } else {
     overlay.classList.add('hidden');
     overlay.onclick = null;
@@ -648,7 +679,7 @@ function drawExportFrame(ctx, panels, panelRects, frameRects, labelInfos, bgImg,
     ctx.save();
     roundRect(ctx, pr.x, pr.y, pr.w, pr.h, radius);
     ctx.clip();
-    ctx.drawImage(panels[j].video, pr.x, pr.y, pr.w, pr.h);
+    ctx.drawImage(panels[j].el, pr.x, pr.y, pr.w, pr.h);
     ctx.restore();
   }
 
