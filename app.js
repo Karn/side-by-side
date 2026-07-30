@@ -101,8 +101,14 @@ const panelDivider = document.getElementById('panel-divider');
 const layoutFrameSelect = document.getElementById('layout-frame-select');
 const btnBg = document.getElementById('btn-bg');
 
-// Background button triggers hidden file input
-btnBg.addEventListener('click', () => layoutBgInput.click());
+// Background button toggles the current image: clear it when set, or open the picker.
+btnBg.addEventListener('click', () => {
+  if (layoutState.bgImage) {
+    clearLayoutBg();
+  } else {
+    layoutBgInput.click();
+  }
+});
 
 // Frame type
 layoutFrameSelect.addEventListener('change', () => {
@@ -127,7 +133,19 @@ layoutBgInput.addEventListener('change', (e) => {
   applyLayoutBg();
 });
 
+function clearLayoutBg() {
+  if (layoutState.bgImage) URL.revokeObjectURL(layoutState.bgImage);
+  layoutState.bgImage = null;
+  layoutBgInput.value = '';
+  applyLayoutBg();
+}
+
 function applyLayoutBg() {
+  const hasBackground = Boolean(layoutState.bgImage);
+  btnBg.classList.toggle('on', hasBackground);
+  btnBg.setAttribute('aria-pressed', hasBackground);
+  btnBg.title = hasBackground ? 'Clear background image' : 'Set background image';
+
   if (layoutState.bgImage) {
     canvasEl.style.backgroundImage = `url(${layoutState.bgImage})`;
     canvasEl.style.backgroundRepeat = 'no-repeat';
