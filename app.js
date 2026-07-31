@@ -416,7 +416,7 @@ async function exportVideoOrGif(panels) {
   }
 
   function updateTitle() {
-    overlayTitle.textContent = isSequentialMode() ? 'Exporting Sequentially' : 'Exporting';
+    overlayTitle.textContent = isSequentialMode() ? 'Exporting (sequential playback)' : 'Exporting';
   }
 
   updateTitle();
