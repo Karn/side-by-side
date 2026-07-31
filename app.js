@@ -83,11 +83,18 @@ applyCanvasPadding();
 const btnPlay = document.getElementById('btn-play');
 const btnExport = document.getElementById('btn-export');
 const speedSel = document.getElementById('speed');
-const playModeSel = document.getElementById('play-mode');
+const btnSequential = document.getElementById('btn-sequential');
 
 btnPlay.addEventListener('click', togglePlay);
 btnExport.addEventListener('click', exportCanvas);
 speedSel.addEventListener('change', applySpeed);
+btnSequential.addEventListener('click', () => {
+  const enabled = !btnSequential.classList.contains('on');
+  btnSequential.classList.toggle('on', enabled);
+  btnSequential.setAttribute('aria-pressed', enabled);
+});
+
+function isSequentialMode() { return btnSequential.classList.contains('on'); }
 
 function applySpeed() {
   const r = parseFloat(speedSel.value);
@@ -285,7 +292,7 @@ let sequential = false; // true while playing left-then-right instead of side by
 
 function togglePlay() {
   if (playing) { stopPlay(); return; }
-  if (playModeSel.value === 'sequential') startSequentialPlay(); else startPlay();
+  if (isSequentialMode()) startSequentialPlay(); else startPlay();
 }
 
 function videoPanels() {
@@ -395,11 +402,10 @@ async function exportVideoOrGif(panels) {
   const clips = panels;
   const clipDurations = clips.map(p => (p.outPoint ?? p.duration) - (p.inPoint ?? 0));
 
-  function isSequential() { return playModeSel.value === 'sequential'; }
   function getFPS() { return parseInt(fpsSelect.value) || 30; }
 
   function currentDuration() {
-    return isSequential()
+    return isSequentialMode()
       ? clipDurations.reduce((a, b) => a + b, 0)
       : Math.max(...clipDurations);
   }
@@ -410,7 +416,7 @@ async function exportVideoOrGif(panels) {
   }
 
   function updateTitle() {
-    overlayTitle.textContent = isSequential() ? 'Exporting Sequentially' : 'Exporting';
+    overlayTitle.textContent = isSequentialMode() ? 'Exporting Sequentially' : 'Exporting';
   }
 
   updateTitle();
@@ -453,7 +459,7 @@ async function exportVideoOrGif(panels) {
   overlay.onclick = (e) => { if (e.target === overlay) dismiss(); };
 
   const exportSpeed = parseFloat(speedSelect.value) || 1;
-  const sequentialExport = isSequential();
+  const sequentialExport = isSequentialMode();
   const clipStarts = [];
   if (sequentialExport) {
     let acc = 0;
