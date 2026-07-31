@@ -346,16 +346,15 @@ async function exportCanvas() {
   const framesTotal = overlay.querySelector('.export-frames-total');
   const actionBtn = overlay.querySelector('.export-action-btn');
   const formatSelect = document.getElementById('export-format');
-  const speedSelect = document.getElementById('export-speed');
   const fpsSelect = document.getElementById('export-fps');
 
   const duration = Math.max(...panels.map(p => (p.outPoint ?? p.duration) - (p.inPoint ?? 0)));
 
+  function getSpeed() { return parseFloat(speedSel.value) || 1; }
   function getFPS() { return parseInt(fpsSelect.value) || 30; }
 
   function calcTotalFrames() {
-    const speed = parseFloat(speedSelect.value) || 1;
-    return Math.ceil((duration / speed) * getFPS());
+    return Math.ceil((duration / getSpeed()) * getFPS());
   }
 
   overlay.classList.remove('hidden');
@@ -365,16 +364,14 @@ async function exportCanvas() {
   actionBtn.textContent = 'Export';
   actionBtn.classList.remove('on');
   formatSelect.disabled = false;
-  speedSelect.disabled = false;
   fpsSelect.disabled = false;
   actionBtn.focus();
 
-  // Recalculate total when speed or fps changes
-  speedSelect.onchange = () => { framesTotal.textContent = calcTotalFrames(); };
+  // Recalculate total when fps changes
   fpsSelect.onchange = () => { framesTotal.textContent = calcTotalFrames(); };
 
   let cancelled = false;
-  const dismiss = () => { cancelled = true; overlay.classList.add('hidden'); speedSelect.onchange = null; fpsSelect.onchange = null; };
+  const dismiss = () => { cancelled = true; overlay.classList.add('hidden'); fpsSelect.onchange = null; };
   overlay.onclick = (e) => { if (e.target === overlay) dismiss(); };
 
   // Wait for user to click Export or dismiss
@@ -383,7 +380,6 @@ async function exportCanvas() {
       actionBtn.textContent = 'Cancel';
       actionBtn.classList.add('on');
       formatSelect.disabled = true;
-      speedSelect.disabled = true;
       fpsSelect.disabled = true;
       resolve();
     };
@@ -396,10 +392,9 @@ async function exportCanvas() {
   actionBtn.onclick = dismiss;
   overlay.onclick = (e) => { if (e.target === overlay) dismiss(); };
 
-  const exportSpeed = parseFloat(speedSelect.value) || 1;
+  const exportSpeed = getSpeed();
   const exportFormat = formatSelect.value;
   const FPS = getFPS();
-  speedSelect.onchange = null;
   fpsSelect.onchange = null;
 
   const isGif = exportFormat === 'gif';
