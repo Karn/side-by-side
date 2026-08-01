@@ -41,9 +41,9 @@
           <rect x="6" y="10" width="36" height="28" rx="3"/>
           <polygon points="20,17 20,31 32,24"/>
         </svg>
-        <div class="drop-label">Drop video</div>
-        <div class="drop-formats">MP4, WebM, MOV</div>
-        <input type="file" accept="video/*">
+        <div class="drop-label">Drop video or photo</div>
+        <div class="drop-formats">MP4, WebM, MOV, JPG, PNG</div>
+        <input type="file" accept="video/*,image/*">
       </div>
       <div class="panel-content">
         <div class="panel-label hidden">
@@ -82,9 +82,9 @@
           <rect x="6" y="10" width="36" height="28" rx="3"/>
           <polygon points="20,17 20,31 32,24"/>
         </svg>
-        <div class="drop-label">Drop video</div>
-        <div class="drop-formats">MP4, WebM, MOV</div>
-        <input type="file" accept="video/*">
+        <div class="drop-label">Drop video or photo</div>
+        <div class="drop-formats">MP4, WebM, MOV, JPG, PNG</div>
+        <input type="file" accept="video/*,image/*">
       </div>
       <div class="panel-content">
         <div class="panel-label hidden">
@@ -123,6 +123,7 @@
 <div class="bottombar">
   <div class="toolbar-group">
     <button id="btn-play">Play [Space]</button>
+    <button id="btn-sequential" type="button" title="Play left, then right, instead of side by side" aria-pressed="false">Sequential</button>
     <select id="speed" title="Playback speed">
       <option value="0.25">Speed: 0.25x</option>
       <option value="0.5">Speed: 0.5x</option>
@@ -132,7 +133,7 @@
     </select>
   </div>
   <div class="toolbar-group">
-    <button id="btn-export" title="Export trimmed clip from active panel [E]">Export [E]</button>
+    <button id="btn-export" title="Export [E]">Export [E]</button>
   </div>
 </div>
 
@@ -161,13 +162,6 @@
           <option value="webm" selected>WebM</option>
           <option value="mp4">MP4</option>
           <option value="gif">GIF</option>
-        </select>
-        <select class="export-format-select" id="export-speed">
-          <option value="0.25">0.25x</option>
-          <option value="0.5">0.5x</option>
-          <option value="1" selected>1x</option>
-          <option value="1.5">1.5x</option>
-          <option value="2">2x</option>
         </select>
         <button class="export-action-btn">Export</button>
       </div>

@@ -83,10 +83,18 @@ applyCanvasPadding();
 const btnPlay = document.getElementById('btn-play');
 const btnExport = document.getElementById('btn-export');
 const speedSel = document.getElementById('speed');
+const btnSequential = document.getElementById('btn-sequential');
 
 btnPlay.addEventListener('click', togglePlay);
 btnExport.addEventListener('click', exportCanvas);
 speedSel.addEventListener('change', applySpeed);
+btnSequential.addEventListener('click', () => {
+  const enabled = !btnSequential.classList.contains('on');
+  btnSequential.classList.toggle('on', enabled);
+  btnSequential.setAttribute('aria-pressed', enabled);
+});
+
+function isSequentialMode() { return btnSequential.classList.contains('on'); }
 
 function applySpeed() {
   const r = parseFloat(speedSel.value);
@@ -280,28 +288,63 @@ function applyLayoutGap() {
 
 // ── Playback ──
 
-function togglePlay() { playing ? stopPlay() : startPlay(); }
+let sequential = false; // true while playing left-then-right instead of side by side
+
+function togglePlay() {
+  if (playing) { stopPlay(); return; }
+  if (isSequentialMode()) startSequentialPlay(); else startPlay();
+}
+
+function videoPanels() {
+  return [leftPanel, rightPanel].filter(p => p.loaded && p.mediaType === 'video');
+}
+
+function setPlayButtonState(isPlaying) {
+  btnPlay.textContent = isPlaying ? 'Pause [Space]' : 'Play [Space]';
+  btnPlay.classList.toggle('on', isPlaying);
+}
 
 function startPlay() {
-  if (!leftPanel.loaded && !rightPanel.loaded) return;
+  const panels = videoPanels();
+  if (panels.length === 0) return;
   playing = true;
-  btnPlay.textContent = 'Pause [Space]';
-  btnPlay.classList.add('on');
+  sequential = false;
+  setPlayButtonState(true);
   applySpeed();
 
-  if (leftPanel.loaded) leftPanel.currentTime = leftPanel.inPoint ?? 0;
-  if (rightPanel.loaded) rightPanel.currentTime = rightPanel.inPoint ?? 0;
+  panels.forEach(p => { p.loopPlayback = true; p.onRangeEnd = null; p.currentTime = p.inPoint ?? 0; });
+  panels.forEach(p => p.startRendering());
+  panels.forEach(p => p.play());
+}
 
-  leftPanel.startRendering(); rightPanel.startRendering();
-  leftPanel.play(); rightPanel.play();
+// Left plays through, freezes on its last frame, then right plays — looping
+// the two-phase sequence until paused. Each panel pauses itself at its own
+// outPoint (loopPlayback=false) instead of looping, and hands off via onRangeEnd.
+function startSequentialPlay() {
+  const panels = videoPanels();
+  if (panels.length === 0) return;
+  playing = true;
+  sequential = true;
+  setPlayButtonState(true);
+  applySpeed();
+
+  panels.forEach(p => { p.loopPlayback = false; p.currentTime = p.inPoint ?? 0; p.startRendering(); });
+  runSequentialPhase(panels, 0);
+}
+
+function runSequentialPhase(panels, index) {
+  if (!playing || !sequential) return; // playback was stopped in the meantime
+  const active = panels[index % panels.length];
+  active.currentTime = active.inPoint ?? 0;
+  active.onRangeEnd = () => runSequentialPhase(panels, index + 1);
+  active.play();
 }
 
 function stopPlay() {
   playing = false;
-  btnPlay.textContent = 'Play [Space]';
-  btnPlay.classList.remove('on');
-  leftPanel.pause(); rightPanel.pause();
-  leftPanel.stopRendering(); rightPanel.stopRendering();
+  sequential = false;
+  setPlayButtonState(false);
+  videoPanels().forEach(p => { p.pause(); p.stopRendering(); p.loopPlayback = true; p.onRangeEnd = null; });
 }
 
 // ── Title / Subtitle toggles ──
@@ -333,96 +376,18 @@ function updatePanelLabelsVisibility() {
 
 // ── Export ──
 
-async function exportCanvas() {
-  const panels = [];
-  if (leftPanel.loaded) panels.push(leftPanel);
-  if (rightPanel.loaded) panels.push(rightPanel);
-  if (panels.length === 0) return;
-  if (playing) stopPlay();
-
-  const overlay = document.getElementById('export-overlay');
-  const progressFill = overlay.querySelector('.progress-fill');
-  const framesCurrent = overlay.querySelector('.export-frames-current');
-  const framesTotal = overlay.querySelector('.export-frames-total');
-  const actionBtn = overlay.querySelector('.export-action-btn');
-  const formatSelect = document.getElementById('export-format');
-  const speedSelect = document.getElementById('export-speed');
-  const fpsSelect = document.getElementById('export-fps');
-
-  const duration = Math.max(...panels.map(p => (p.outPoint ?? p.duration) - (p.inPoint ?? 0)));
-
-  function getFPS() { return parseInt(fpsSelect.value) || 30; }
-
-  function calcTotalFrames() {
-    const speed = parseFloat(speedSelect.value) || 1;
-    return Math.ceil((duration / speed) * getFPS());
-  }
-
-  overlay.classList.remove('hidden');
-  progressFill.style.width = '0%';
-  framesCurrent.textContent = '0';
-  framesTotal.textContent = calcTotalFrames();
-  actionBtn.textContent = 'Export';
-  actionBtn.classList.remove('on');
-  formatSelect.disabled = false;
-  speedSelect.disabled = false;
-  fpsSelect.disabled = false;
-  actionBtn.focus();
-
-  // Recalculate total when speed or fps changes
-  speedSelect.onchange = () => { framesTotal.textContent = calcTotalFrames(); };
-  fpsSelect.onchange = () => { framesTotal.textContent = calcTotalFrames(); };
-
-  let cancelled = false;
-  const dismiss = () => { cancelled = true; overlay.classList.add('hidden'); speedSelect.onchange = null; fpsSelect.onchange = null; };
-  overlay.onclick = (e) => { if (e.target === overlay) dismiss(); };
-
-  // Wait for user to click Export or dismiss
-  await new Promise(resolve => {
-    actionBtn.onclick = () => {
-      actionBtn.textContent = 'Cancel';
-      actionBtn.classList.add('on');
-      formatSelect.disabled = true;
-      speedSelect.disabled = true;
-      fpsSelect.disabled = true;
-      resolve();
-    };
-    const prevDismiss = dismiss;
-    overlay.onclick = (e) => { if (e.target === overlay) { prevDismiss(); resolve(); } };
-  });
-
-  if (cancelled) { overlay.onclick = null; return; }
-
-  actionBtn.onclick = dismiss;
-  overlay.onclick = (e) => { if (e.target === overlay) dismiss(); };
-
-  const exportSpeed = parseFloat(speedSelect.value) || 1;
-  const exportFormat = formatSelect.value;
-  const FPS = getFPS();
-  speedSelect.onchange = null;
-  fpsSelect.onchange = null;
-
-  const isGif = exportFormat === 'gif';
-
-  // GIF uses reduced resolution for reasonable file size
-  const EXPORT_W = isGif ? 960 : 1920;
-  const EXPORT_H = isGif ? 540 : 1080;
-  const FRAME_DUR = 1 / FPS;
-  const totalFrames = calcTotalFrames();
-
-  // Offscreen canvas at export resolution, with ctx.scale() so we can
-  // draw using on-screen coordinates directly — the transform handles scaling.
+// Shared setup for both the still-image and video/GIF export paths: an
+// offscreen canvas at export resolution (scaled from on-screen coordinates),
+// plus the background image, panel/frame rects, labels, and colors to draw with.
+async function buildExportGeometry(panels, exportW, exportH) {
   const oc = document.createElement('canvas');
-  oc.width = EXPORT_W;
-  oc.height = EXPORT_H;
+  oc.width = exportW;
+  oc.height = exportH;
   const ctx = oc.getContext('2d');
 
   const canvasRect = canvasEl.getBoundingClientRect();
-  const scaleX = EXPORT_W / canvasRect.width;
-  const scaleY = EXPORT_H / canvasRect.height;
-  ctx.scale(scaleX, scaleY);
+  ctx.scale(exportW / canvasRect.width, exportH / canvasRect.height);
 
-  // Load background image if set
   let bgImg = null;
   if (layoutState.bgImage) {
     bgImg = new Image();
@@ -430,7 +395,6 @@ async function exportCanvas() {
     await new Promise(r => { bgImg.onload = r; });
   }
 
-  // Read positions directly from the on-screen layout (screen pixels)
   const panelRects = panels.map(p => {
     const r = p.canvas.getBoundingClientRect();
     return { x: r.left - canvasRect.left, y: r.top - canvasRect.top, w: r.width, h: r.height };
@@ -458,12 +422,154 @@ async function exportCanvas() {
     };
   });
 
-  // Read computed styles once
   const bgColor = getComputedStyle(canvasEl).backgroundColor;
   const phoneBorderColor = getComputedStyle(document.documentElement).getPropertyValue('--color-phone-border').trim();
   const titleColor = getComputedStyle(document.documentElement).getPropertyValue('--color-label-title').trim();
   const subtitleColor = getComputedStyle(document.documentElement).getPropertyValue('--color-label-subtitle').trim();
   const font = `-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif`;
+
+  return { oc, ctx, canvasRect, bgImg, panelRects, frameRects, labelInfos, bgColor, phoneBorderColor, titleColor, subtitleColor, font };
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// A video trimmed down to (or naturally only) one frame behaves like a photo for
+// export purposes: there's nothing to play, so it should freeze-frame like one.
+function isEffectivelyStill(p) {
+  if (p.mediaType === 'image') return true;
+  const trimmed = (p.outPoint ?? p.duration) - (p.inPoint ?? 0);
+  return trimmed <= FRAME_DURATION + 0.001;
+}
+
+// One or two videos, optionally paired with a photo (which freeze-frames for the whole export).
+// In sequential mode, clips play one after another (left, then right) instead of side by side at
+// once — each clip freeze-frames on its first frame before its turn and its last frame after.
+async function exportCanvas() {
+  const panels = [];
+  if (leftPanel.loaded) panels.push(leftPanel);
+  if (rightPanel.loaded) panels.push(rightPanel);
+  if (panels.length === 0) return;
+  if (playing) stopPlay();
+
+  // Nothing left to actually play (all photos, or all single-frame video) → a still image,
+  // regardless of playback mode: there's nothing to sequence between two stills.
+  if (panels.every(isEffectivelyStill)) {
+    await exportStillImage(panels);
+    return;
+  }
+  await exportVideoOrGif(panels);
+}
+
+// All panels are stills (photos, and/or single-frame video): render one frame straight to a PNG.
+async function exportStillImage(panels) {
+  const { oc, ctx, canvasRect, bgImg, panelRects, frameRects, labelInfos, bgColor, phoneBorderColor, titleColor, subtitleColor, font } =
+    await buildExportGeometry(panels, 1920, 1080);
+
+  drawExportFrame(ctx, panels, panelRects, frameRects, labelInfos, bgImg, bgColor, phoneBorderColor, titleColor, subtitleColor, font, canvasRect.width, canvasRect.height);
+
+  const blob = await new Promise(resolve => oc.toBlob(resolve, 'image/png'));
+  if (blob) downloadBlob(blob, 'comparison.png');
+}
+
+async function exportVideoOrGif(panels) {
+  const overlay = document.getElementById('export-overlay');
+  const overlayTitle = overlay.querySelector('.export-title');
+  const progressFill = overlay.querySelector('.progress-fill');
+  const framesCurrent = overlay.querySelector('.export-frames-current');
+  const framesTotal = overlay.querySelector('.export-frames-total');
+  const actionBtn = overlay.querySelector('.export-action-btn');
+  const formatSelect = document.getElementById('export-format');
+  const fpsSelect = document.getElementById('export-fps');
+
+  const clips = panels.filter(p => p.mediaType === 'video');
+  const clipDurations = clips.map(p => (p.outPoint ?? p.duration) - (p.inPoint ?? 0));
+
+  function getSpeed() { return parseFloat(speedSel.value) || 1; }
+  function getFPS() { return parseInt(fpsSelect.value) || 30; }
+
+  function currentDuration() {
+    return isSequentialMode()
+      ? clipDurations.reduce((a, b) => a + b, 0)
+      : Math.max(...clipDurations);
+  }
+
+  function calcTotalFrames() {
+    return Math.ceil((currentDuration() / getSpeed()) * getFPS());
+  }
+
+  function updateTitle() {
+    overlayTitle.textContent = isSequentialMode() ? 'Exporting (sequential playback)' : 'Exporting';
+  }
+
+  updateTitle();
+  overlay.classList.remove('hidden');
+  progressFill.style.width = '0%';
+  framesCurrent.textContent = '0';
+  framesTotal.textContent = calcTotalFrames();
+  actionBtn.textContent = 'Export';
+  actionBtn.classList.remove('on');
+  formatSelect.disabled = false;
+  fpsSelect.disabled = false;
+  actionBtn.focus();
+
+  // Recalculate total when fps changes
+  fpsSelect.onchange = () => { framesTotal.textContent = calcTotalFrames(); };
+
+  let cancelled = false;
+  const dismiss = () => {
+    cancelled = true;
+    overlay.classList.add('hidden');
+    fpsSelect.onchange = null;
+  };
+  overlay.onclick = (e) => { if (e.target === overlay) dismiss(); };
+
+  // Wait for user to click Export or dismiss
+  await new Promise(resolve => {
+    actionBtn.onclick = () => {
+      actionBtn.textContent = 'Cancel';
+      actionBtn.classList.add('on');
+      formatSelect.disabled = true;
+      fpsSelect.disabled = true;
+      resolve();
+    };
+    const prevDismiss = dismiss;
+    overlay.onclick = (e) => { if (e.target === overlay) { prevDismiss(); resolve(); } };
+  });
+
+  if (cancelled) { overlay.onclick = null; return; }
+
+  actionBtn.onclick = dismiss;
+  overlay.onclick = (e) => { if (e.target === overlay) dismiss(); };
+
+  const sequentialExport = isSequentialMode();
+  const clipStarts = [];
+  if (sequentialExport) {
+    let acc = 0;
+    for (const d of clipDurations) { clipStarts.push(acc); acc += d; }
+  }
+
+  const exportSpeed = getSpeed();
+  const exportFormat = formatSelect.value;
+  const FPS = getFPS();
+  fpsSelect.onchange = null;
+
+  const isGif = exportFormat === 'gif';
+
+  // GIF uses reduced resolution for reasonable file size
+  const EXPORT_W = isGif ? 960 : 1920;
+  const EXPORT_H = isGif ? 540 : 1080;
+  const FRAME_DUR = 1 / FPS;
+  const totalFrames = calcTotalFrames();
+
+  const { oc, ctx, canvasRect, bgImg, panelRects, frameRects, labelInfos, bgColor, phoneBorderColor, titleColor, subtitleColor, font } =
+    await buildExportGeometry(panels, EXPORT_W, EXPORT_H);
 
   // GIF: collect frames directly. Video: use MediaRecorder.
   let recorder, stream, chunks = [], stopped, mimeType;
@@ -490,11 +596,20 @@ async function exportCanvas() {
     framesCurrent.textContent = isGif ? `GIF ${i + 1} / ${totalFrames}` : String(i + 1);
     progressFill.style.width = ((i + 1) / totalFrames * 100) + '%';
 
-    // Seek all panels to the correct time
-    await Promise.all(panels.map(p => {
+    // Seek video panels to the correct time; photo panels stay a freeze-frame throughout.
+    await Promise.all(clips.map((p, idx) => {
       const start = p.inPoint ?? 0;
       const end = p.outPoint ?? p.duration;
-      const target = Math.min(start + t, end);
+      let target;
+      if (sequentialExport) {
+        const segStart = clipStarts[idx];
+        const segEnd = segStart + clipDurations[idx];
+        if (t < segStart) target = start;               // hasn't had its turn yet: first frame
+        else if (t >= segEnd) target = end;              // already had its turn: last frame
+        else target = start + (t - segStart);            // its turn: playing
+      } else {
+        target = Math.min(start + t, end);
+      }
       if (Math.abs(p.video.currentTime - target) < 0.001) return Promise.resolve();
       p.video.currentTime = target;
       return new Promise(r => p.video.addEventListener('seeked', r, { once: true }));
@@ -531,14 +646,7 @@ async function exportCanvas() {
     overlay.classList.add('hidden');
     overlay.onclick = null;
 
-    if (blob) {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `comparison.${ext}`;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
+    if (blob) downloadBlob(blob, `comparison.${ext}`);
   } else {
     overlay.classList.add('hidden');
     overlay.onclick = null;
@@ -571,7 +679,7 @@ function drawExportFrame(ctx, panels, panelRects, frameRects, labelInfos, bgImg,
     ctx.save();
     roundRect(ctx, pr.x, pr.y, pr.w, pr.h, radius);
     ctx.clip();
-    ctx.drawImage(panels[j].video, pr.x, pr.y, pr.w, pr.h);
+    ctx.drawImage(panels[j].el, pr.x, pr.y, pr.w, pr.h);
     ctx.restore();
   }
 
@@ -626,5 +734,6 @@ document.addEventListener('keydown', (e) => {
 
   switch (e.code) {
     case 'Space': e.preventDefault(); togglePlay(); break;
+    case 'KeyE': e.preventDefault(); exportCanvas(); break;
   }
 });

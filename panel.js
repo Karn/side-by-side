@@ -27,10 +27,14 @@ class VideoPanel {
     this.video = document.createElement('video');
     this.video.playsInline = true;
     this.video.preload = 'auto';
+    this.image = null;
+    this.mediaType = null;   // 'video' | 'image' | null
     this.loaded = false;
     this.file = null;
     this.inPoint = null;
     this.outPoint = null;
+    this.loopPlayback = true; // false during sequential play: pause at outPoint instead of looping
+    this.onRangeEnd = null;   // fires once when playback reaches outPoint with loopPlayback=false
     this._rafId = null;
     this._dragging = null;   // 'in' | 'out' | 'range' | null
     this._dragStartRatio = 0;
@@ -52,7 +56,7 @@ class VideoPanel {
       e.preventDefault();
       dz.classList.remove('dragover');
       const f = e.dataTransfer.files[0];
-      if (f && f.type.startsWith('video/')) this.loadFile(f);
+      if (f && (f.type.startsWith('video/') || f.type.startsWith('image/'))) this.loadFile(f);
     });
 
     // Lane mouse interaction
@@ -64,14 +68,24 @@ class VideoPanel {
 
     // Redraw on seek
     this.video.addEventListener('seeked', () => this._drawFrame());
+
+    // Native end-of-media fires (and auto-pauses) independently of our per-frame
+    // range poll below — for an untrimmed clip that race can leave the poll never
+    // seeing currentTime >= end while still !paused, so this is the reliable signal.
+    this.video.addEventListener('ended', () => this._handleRangeEnd());
   }
 
   loadFile(file) {
     this.file = file;
+    this.mediaType = file.type.startsWith('image/') ? 'image' : 'video';
     this.titlebarTitle.textContent = file.name;
     this.inPoint = null;
     this.outPoint = null;
     this._updateTrimBadge();
+    return this.mediaType === 'image' ? this._loadImage(file) : this._loadVideo(file);
+  }
+
+  _loadVideo(file) {
     if (this.video.src) URL.revokeObjectURL(this.video.src);
     this.video.src = URL.createObjectURL(file);
     this.video.load();
@@ -88,6 +102,29 @@ class VideoPanel {
         this._drawFrame();
         this._updateUI();
         this._updateRangeVisual();
+
+        if (this.onLoad) this.onLoad();
+        resolve();
+      }, { once: true });
+    });
+  }
+
+  // Photos have no scrubbable range, so the timeline bar is left in its
+  // 'empty' state — that also makes it display:none, which disables lane
+  // mouse interaction for free (hidden elements receive no mouse events).
+  _loadImage(file) {
+    if (this.image && this.image.src) URL.revokeObjectURL(this.image.src);
+    this.image = new Image();
+    this.image.src = URL.createObjectURL(file);
+    return new Promise((resolve) => {
+      this.image.addEventListener('load', () => {
+        this.loaded = true;
+        this.frame.classList.add('loaded');
+        this.dropZone.classList.add('hidden');
+        this.panelContent.classList.add('loaded');
+        this.canvas.width = this.image.naturalWidth;
+        this.canvas.height = this.image.naturalHeight;
+        this._drawFrame();
 
         if (this.onLoad) this.onLoad();
         resolve();
@@ -123,15 +160,35 @@ class VideoPanel {
 
   _drawFrame() {
     if (!this.loaded) return;
-    // Enforce playback range
+    if (this.mediaType === 'image') {
+      this.ctx.drawImage(this.image, 0, 0, this.canvas.width, this.canvas.height);
+      return;
+    }
+    // Enforce playback range. Only needed here for a custom outPoint short of the
+    // video's real end — reaching the real end is instead handled by the 'ended'
+    // listener above, which the browser fires reliably regardless of this poll.
     if (!this.video.paused) {
       const end = this.outPoint ?? this.video.duration;
-      if (this.video.currentTime >= end) {
-        this.video.currentTime = this.inPoint ?? 0;
-      }
+      if (this.video.currentTime >= end) this._handleRangeEnd();
     }
     this.ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
     this._updateUI();
+  }
+
+  // Shared by the range poll and the native 'ended' event — idempotent since
+  // onRangeEnd is nulled out after firing, so it's safe if both end up calling this.
+  _handleRangeEnd() {
+    const end = this.outPoint ?? this.video.duration;
+    if (this.loopPlayback) {
+      this.video.currentTime = this.inPoint ?? 0;
+      if (this.video.paused) this.video.play();
+    } else {
+      this.video.pause();
+      this.video.currentTime = end;
+      const cb = this.onRangeEnd;
+      this.onRangeEnd = null;
+      if (cb) cb();
+    }
   }
 
   _updateUI() {
@@ -150,14 +207,16 @@ class VideoPanel {
     if (this.loaded) this._drawFrame();
   }
 
-  play() { if (this.loaded) this.video.play(); }
-  pause() { if (this.loaded) { this.video.pause(); this._drawFrame(); } }
+  play() { if (this.loaded && this.mediaType === 'video') this.video.play(); }
+  pause() { if (this.loaded && this.mediaType === 'video') { this.video.pause(); this._drawFrame(); } }
 
   get paused() { return this.video.paused; }
   get currentTime() { return this.video.currentTime; }
   set currentTime(v) { this.video.currentTime = Math.max(0, Math.min(v, this.video.duration || 0)); }
   get duration() { return this.video.duration || 0; }
   set playbackRate(r) { this.video.playbackRate = r; }
+  // The element export drawing reads from — a <video> or an <img>, drawImage() accepts both.
+  get el() { return this.mediaType === 'image' ? this.image : this.video; }
 
   // ── Lane mouse handlers ──
 
