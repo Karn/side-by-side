@@ -31,6 +31,8 @@ class VideoPanel {
     this.file = null;
     this.inPoint = null;
     this.outPoint = null;
+    this.loopPlayback = true; // false during sequential play: pause at outPoint instead of looping
+    this.onRangeEnd = null;   // fires once when playback reaches outPoint with loopPlayback=false
     this._rafId = null;
     this._dragging = null;   // 'in' | 'out' | 'range' | null
     this._dragStartRatio = 0;
@@ -64,6 +66,11 @@ class VideoPanel {
 
     // Redraw on seek
     this.video.addEventListener('seeked', () => this._drawFrame());
+
+    // Native end-of-media fires (and auto-pauses) independently of our per-frame
+    // range poll below — for an untrimmed clip that race can leave the poll never
+    // seeing currentTime >= end while still !paused, so this is the reliable signal.
+    this.video.addEventListener('ended', () => this._handleRangeEnd());
   }
 
   loadFile(file) {
@@ -123,15 +130,31 @@ class VideoPanel {
 
   _drawFrame() {
     if (!this.loaded) return;
-    // Enforce playback range
+    // Enforce playback range. Only needed here for a custom outPoint short of the
+    // video's real end — reaching the real end is instead handled by the 'ended'
+    // listener above, which the browser fires reliably regardless of this poll.
     if (!this.video.paused) {
       const end = this.outPoint ?? this.video.duration;
-      if (this.video.currentTime >= end) {
-        this.video.currentTime = this.inPoint ?? 0;
-      }
+      if (this.video.currentTime >= end) this._handleRangeEnd();
     }
     this.ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
     this._updateUI();
+  }
+
+  // Shared by the range poll and the native 'ended' event — idempotent since
+  // onRangeEnd is nulled out after firing, so it's safe if both end up calling this.
+  _handleRangeEnd() {
+    const end = this.outPoint ?? this.video.duration;
+    if (this.loopPlayback) {
+      this.video.currentTime = this.inPoint ?? 0;
+      if (this.video.paused) this.video.play();
+    } else {
+      this.video.pause();
+      this.video.currentTime = end;
+      const cb = this.onRangeEnd;
+      this.onRangeEnd = null;
+      if (cb) cb();
+    }
   }
 
   _updateUI() {
