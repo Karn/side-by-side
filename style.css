@@ -308,6 +308,47 @@ select {
   flex-shrink: 0;
 }
 
+.canvas[data-label-position="bottom"] .panel-content {
+  flex-direction: column-reverse;
+}
+
+.canvas[data-label-position="bottom"] .panel-label {
+  margin: 8px 0 0;
+}
+
+.canvas[data-label-position="outer-sides"] .panel-content {
+  flex-direction: row;
+  gap: 8px;
+}
+
+.canvas[data-label-position="outer-sides"] #panel-right .panel-content {
+  flex-direction: row-reverse;
+}
+
+.canvas[data-label-position="outer-sides"] .panel-label {
+  align-self: center;
+  width: clamp(96px, 30%, 200px);
+  margin: 0;
+}
+
+.canvas[data-label-position="outer-sides"] .video-sizer {
+  display: flex;
+  align-items: center;
+}
+
+.canvas[data-label-position="outer-sides"] #panel-left .video-sizer {
+  justify-content: flex-end;
+}
+
+.canvas[data-label-position="outer-sides"] #panel-right .video-sizer {
+  justify-content: flex-start;
+}
+
+.canvas[data-label-position="outer-sides"] #panel-right .label-title-input,
+.canvas[data-label-position="outer-sides"] #panel-right .label-subtitle-input {
+  text-align: right;
+}
+
 .panel-label.hidden { display: none; }
 
 .label-title-input.hidden { display: none; }
@@ -326,13 +367,13 @@ select {
 }
 
 .label-title-input {
-  font-size: 14px;
+  font-size: var(--label-title-size, 14px);
   font-weight: 600;
   color: var(--color-label-title);
 }
 
 .label-subtitle-input {
-  font-size: 12px;
+  font-size: var(--label-subtitle-size, 12px);
   font-weight: 400;
   color: var(--color-label-subtitle);
 }
@@ -355,12 +396,14 @@ select {
 /* Outer sizer absorbs flex stretch; inner VPF wraps content naturally */
 .video-sizer {
   flex: 1;
+  min-width: 0;
   min-height: 0;
 }
 
 .video-player-frame.loaded {
   display: flex;
   flex-direction: column;
+  width: fit-content;
   min-height: 0;
   max-height: 100%;
 }

@@ -20,8 +20,19 @@
     <input type="file" id="layout-bg-input" accept="image/*" class="toolbar-hidden-input">
   </div>
   <div class="toolbar-group">
-    <button id="btn-title">Title</button>
-    <button id="btn-subtitle">Subtitle</button>
+    <button id="btn-title" type="button" aria-pressed="false">Title</button>
+    <button id="btn-subtitle" type="button" aria-pressed="false">Subtitle</button>
+    <select id="label-size-select" title="Title and subtitle size" aria-label="Title and subtitle size">
+      <option value="s" selected>Size: S</option>
+      <option value="m">Size: M</option>
+      <option value="l">Size: L</option>
+      <option value="xl">Size: XL</option>
+    </select>
+    <select id="label-position-select" title="Title and subtitle position" aria-label="Title and subtitle position">
+      <option value="top" selected>Position: Top</option>
+      <option value="bottom">Position: Bottom</option>
+      <option value="outer-sides">Position: Outer Sides</option>
+    </select>
   </div>
 </div>
 <div class="app-logo">

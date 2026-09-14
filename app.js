@@ -8,6 +8,18 @@ const layoutState = {
   canvasPaddingLeft: 0,
   canvasPaddingRight: 0,
   frame: 'none',
+  titleVisible: false,
+  subtitleVisible: false,
+  labelSize: 's',
+  labelPosition: 'top',
+};
+
+const labelBaseSizes = { title: 14, subtitle: 12 };
+const labelScales = {
+  s: 1,
+  m: 1.25,
+  l: 1.5,
+  xl: 2,
 };
 
 // ── Init ──
@@ -304,32 +316,51 @@ function stopPlay() {
   leftPanel.stopRendering(); rightPanel.stopRendering();
 }
 
-// ── Title / Subtitle toggles ──
+// ── Title / Subtitle controls ──
 
 const btnTitle = document.getElementById('btn-title');
 const btnSubtitle = document.getElementById('btn-subtitle');
-let titleVisible = false;
-let subtitleVisible = false;
+const labelSizeSelect = document.getElementById('label-size-select');
+const labelPositionSelect = document.getElementById('label-position-select');
 
 btnTitle.addEventListener('click', () => {
-  titleVisible = !titleVisible;
-  btnTitle.classList.toggle('on', titleVisible);
-  canvasEl.querySelectorAll('.label-title-input').forEach(el => el.classList.toggle('hidden', !titleVisible));
-  updatePanelLabelsVisibility();
+  layoutState.titleVisible = !layoutState.titleVisible;
+  btnTitle.classList.toggle('on', layoutState.titleVisible);
+  btnTitle.setAttribute('aria-pressed', layoutState.titleVisible);
+  applyLabelSettings();
 });
 
 btnSubtitle.addEventListener('click', () => {
-  subtitleVisible = !subtitleVisible;
-  btnSubtitle.classList.toggle('on', subtitleVisible);
-  canvasEl.querySelectorAll('.label-subtitle-input').forEach(el => el.classList.toggle('hidden', !subtitleVisible));
-  updatePanelLabelsVisibility();
+  layoutState.subtitleVisible = !layoutState.subtitleVisible;
+  btnSubtitle.classList.toggle('on', layoutState.subtitleVisible);
+  btnSubtitle.setAttribute('aria-pressed', layoutState.subtitleVisible);
+  applyLabelSettings();
 });
 
-function updatePanelLabelsVisibility() {
+labelSizeSelect.addEventListener('change', () => {
+  layoutState.labelSize = labelSizeSelect.value;
+  applyLabelSettings();
+});
+
+labelPositionSelect.addEventListener('change', () => {
+  layoutState.labelPosition = labelPositionSelect.value;
+  applyLabelSettings();
+});
+
+function applyLabelSettings() {
+  const scale = labelScales[layoutState.labelSize];
+  canvasEl.style.setProperty('--label-title-size', labelBaseSizes.title * scale + 'px');
+  canvasEl.style.setProperty('--label-subtitle-size', labelBaseSizes.subtitle * scale + 'px');
+  canvasEl.dataset.labelPosition = layoutState.labelPosition;
+
+  canvasEl.querySelectorAll('.label-title-input').forEach(el => el.classList.toggle('hidden', !layoutState.titleVisible));
+  canvasEl.querySelectorAll('.label-subtitle-input').forEach(el => el.classList.toggle('hidden', !layoutState.subtitleVisible));
   canvasEl.querySelectorAll('.panel-label').forEach(el => {
-    el.classList.toggle('hidden', !titleVisible && !subtitleVisible);
+    el.classList.toggle('hidden', !layoutState.titleVisible && !layoutState.subtitleVisible);
   });
 }
+
+applyLabelSettings();
 
 // ── Export ──
 
@@ -444,12 +475,19 @@ async function exportCanvas() {
     if (labelEl.classList.contains('hidden')) return null;
     const titleInput = p.panel.querySelector('.label-title-input');
     const subtitleInput = p.panel.querySelector('.label-subtitle-input');
+    const titleStyle = getComputedStyle(titleInput);
+    const subtitleStyle = getComputedStyle(subtitleInput);
     const r = labelEl.getBoundingClientRect();
     return {
       x: r.left - canvasRect.left,
       y: r.top - canvasRect.top,
       title: !titleInput.classList.contains('hidden') ? titleInput.value : null,
       subtitle: !subtitleInput.classList.contains('hidden') ? subtitleInput.value : null,
+      titleFontSize: parseFloat(titleStyle.fontSize),
+      titleFontWeight: titleStyle.fontWeight,
+      titleLineHeight: parseFloat(titleStyle.lineHeight),
+      subtitleFontSize: parseFloat(subtitleStyle.fontSize),
+      subtitleFontWeight: subtitleStyle.fontWeight,
     };
   });
 
@@ -575,14 +613,14 @@ function drawExportFrame(ctx, panels, panelRects, frameRects, labelInfos, bgImg,
     if (!info) continue;
     let y = info.y;
     if (info.title) {
-      ctx.font = `600 14px ${font}`;
+      ctx.font = `${info.titleFontWeight} ${info.titleFontSize}px ${font}`;
       ctx.fillStyle = titleColor;
       ctx.textBaseline = 'top';
       ctx.fillText(info.title, info.x, y);
-      y += 14 * 1.4;
+      y += info.titleLineHeight;
     }
     if (info.subtitle) {
-      ctx.font = `400 12px ${font}`;
+      ctx.font = `${info.subtitleFontWeight} ${info.subtitleFontSize}px ${font}`;
       ctx.fillStyle = subtitleColor;
       ctx.textBaseline = 'top';
       ctx.fillText(info.subtitle, info.x, y);
