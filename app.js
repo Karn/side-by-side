@@ -381,11 +381,10 @@ async function exportCanvas() {
 
   const duration = Math.max(...panels.map(p => (p.outPoint ?? p.duration) - (p.inPoint ?? 0)));
 
-  function getSpeed() { return parseFloat(speedSel.value) || 1; }
-  function getFPS() { return parseInt(fpsSelect.value) || 30; }
-
   function calcTotalFrames() {
-    return Math.ceil((duration / getSpeed()) * getFPS());
+    const speed = parseFloat(speedSel.value) || 1;
+    const fps = parseInt(fpsSelect.value) || 30;
+    return Math.ceil((duration / speed) * fps);
   }
 
   overlay.classList.remove('hidden');
@@ -402,7 +401,16 @@ async function exportCanvas() {
   fpsSelect.onchange = () => { framesTotal.textContent = calcTotalFrames(); };
 
   let cancelled = false;
-  const dismiss = () => { cancelled = true; overlay.classList.add('hidden'); fpsSelect.onchange = null; };
+  const closeOverlay = () => {
+    overlay.classList.add('hidden');
+    overlay.onclick = null;
+    actionBtn.onclick = null;
+    fpsSelect.onchange = null;
+  };
+  const dismiss = () => {
+    cancelled = true;
+    closeOverlay();
+  };
   overlay.onclick = (e) => { if (e.target === overlay) dismiss(); };
 
   // Wait for user to click Export or dismiss
@@ -414,25 +422,28 @@ async function exportCanvas() {
       fpsSelect.disabled = true;
       resolve();
     };
-    const prevDismiss = dismiss;
-    overlay.onclick = (e) => { if (e.target === overlay) { prevDismiss(); resolve(); } };
+    overlay.onclick = (e) => { if (e.target === overlay) { dismiss(); resolve(); } };
   });
 
-  if (cancelled) { overlay.onclick = null; return; }
+  if (cancelled) return;
 
   actionBtn.onclick = dismiss;
   overlay.onclick = (e) => { if (e.target === overlay) dismiss(); };
 
-  const exportSpeed = getSpeed();
+  const exportSpeed = parseFloat(speedSel.value) || 1;
   const exportFormat = formatSelect.value;
-  const FPS = getFPS();
+  const FPS = parseInt(fpsSelect.value) || 30;
   fpsSelect.onchange = null;
 
-  const isGif = exportFormat === 'gif';
-
-  // GIF uses reduced resolution for reasonable file size
-  const EXPORT_W = isGif ? 960 : 1920;
-  const EXPORT_H = isGif ? 540 : 1080;
+  framesCurrent.textContent = 'Loading exporter…';
+  let exportPlugin;
+  try {
+    exportPlugin = await ExportPlugins.resolve(exportFormat, { fps: FPS });
+  } catch (error) {
+    closeOverlay();
+    throw error;
+  }
+  const { width: EXPORT_W, height: EXPORT_H } = exportPlugin.outputSize;
   const FRAME_DUR = 1 / FPS;
   const totalFrames = calcTotalFrames();
 
@@ -498,125 +509,66 @@ async function exportCanvas() {
   const subtitleColor = getComputedStyle(document.documentElement).getPropertyValue('--color-label-subtitle').trim();
   const font = `-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif`;
 
-  // GIF: collect frames directly. MP4: WebCodecs. WebM: MediaRecorder.
-  const useMp4 = exportFormat === 'mp4' && await mp4EncoderSupported(EXPORT_W, EXPORT_H, FPS);
-  let recorder, stream, chunks = [], stopped, mimeType, encoder;
-  const mp4Samples = [];
-  let mp4Description = null;
-  if (isGif) {
-    framesCurrent.textContent = 'Loading GIF encoder…';
-    await loadGifEncoder();
-  } else if (useMp4) {
-    framesCurrent.textContent = 'Loading MP4 muxer…';
-    await loadMp4Muxer();
-    encoder = new VideoEncoder({
-      output: (chunk, meta) => {
-        if (meta?.decoderConfig?.description) mp4Description = meta.decoderConfig.description;
-        const data = new Uint8Array(chunk.byteLength);
-        chunk.copyTo(data);
-        mp4Samples.push({ data, duration: MP4_TIMESCALE / FPS, isKey: chunk.type === 'key' });
-      },
-      error: err => { throw err; },
-    });
-    encoder.configure({
-      codec: MP4_CODEC,
+  let exporter;
+  try {
+    exporter = await exportPlugin.createSession({
+      canvas: oc,
+      context: ctx,
       width: EXPORT_W,
       height: EXPORT_H,
-      bitrate: VIDEO_BITRATE,
-      framerate: FPS,
-      avc: { format: 'avc' },  // length-prefixed NALs, as MP4 requires
+      fps: FPS,
+      setStatus: status => { framesCurrent.textContent = status; },
     });
-  } else {
-    stream = oc.captureStream(0);
-    mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
-    recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: VIDEO_BITRATE });
-    recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
-    stopped = new Promise(r => { recorder.onstop = r; });
-    recorder.start();
+  } catch (error) {
+    closeOverlay();
+    throw error;
   }
 
-  // Single render pass for all formats
-  const gifFrames = [];
-  for (let i = 0; i < totalFrames && !cancelled; i++) {
-    const t = i * FRAME_DUR * exportSpeed;
-    framesCurrent.textContent = isGif ? `GIF ${i + 1} / ${totalFrames}` : String(i + 1);
-    progressFill.style.width = ((i + 1) / totalFrames * 100) + '%';
+  let blob = null;
+  try {
+    for (let i = 0; i < totalFrames && !cancelled; i++) {
+      const t = i * FRAME_DUR * exportSpeed;
+      framesCurrent.textContent = exportPlugin.frameLabel?.(i + 1, totalFrames) ?? String(i + 1);
+      progressFill.style.width = ((i + 1) / totalFrames * 100) + '%';
 
-    // Seek all panels to the correct time
-    await Promise.all(panels.map(p => {
-      const start = p.inPoint ?? 0;
-      const end = p.outPoint ?? p.duration;
-      const target = Math.min(start + t, end);
-      if (Math.abs(p.video.currentTime - target) < 0.001) return Promise.resolve();
-      p.video.currentTime = target;
-      return new Promise(r => p.video.addEventListener('seeked', r, { once: true }));
-    }));
+      // Seek all panels to the correct time
+      await Promise.all(panels.map(p => {
+        const start = p.inPoint ?? 0;
+        const end = p.outPoint ?? p.duration;
+        const target = Math.min(start + t, end);
+        if (Math.abs(p.video.currentTime - target) < 0.001) return Promise.resolve();
+        p.video.currentTime = target;
+        return new Promise(r => p.video.addEventListener('seeked', r, { once: true }));
+      }));
 
-    drawExportFrame(ctx, panels, panelRects, frameRects, labelInfos, bgImg, bgColor, phoneBorderColor, titleColor, subtitleColor, font, canvasRect.width, canvasRect.height);
-
-    if (isGif) {
-      gifFrames.push(ctx.getImageData(0, 0, EXPORT_W, EXPORT_H));
-    } else if (useMp4) {
-      // Timestamps come from the frame index rather than the wall clock, so
-      // the result is exactly FPS no matter how long each seek took.
-      const frame = new VideoFrame(oc, {
-        timestamp: Math.round(i * 1e6 / FPS),
-        duration: Math.round(1e6 / FPS),
-      });
-      encoder.encode(frame, { keyFrame: i % (FPS * 2) === 0 });
-      frame.close();
-      // Keep the encoder queue bounded so long exports don't balloon memory.
-      if (encoder.encodeQueueSize > 8) {
-        await new Promise(r => encoder.addEventListener('dequeue', r, { once: true }));
-      }
-    } else {
-      stream.getVideoTracks()[0].requestFrame?.();
-    }
-    await new Promise(r => setTimeout(r, 0));
-  }
-
-  if (recorder) {
-    recorder.stop();
-    await stopped;
-  }
-  if (encoder) {
-    await encoder.flush();
-    encoder.close();
-  }
-
-  if (!cancelled) {
-    let blob, ext;
-
-    if (isGif) {
-      framesCurrent.textContent = 'Encoding GIF…';
+      drawExportFrame(ctx, panels, panelRects, frameRects, labelInfos, bgImg, bgColor, phoneBorderColor, titleColor, subtitleColor, font, canvasRect.width, canvasRect.height);
+      await exporter.addFrame(i);
       await new Promise(r => setTimeout(r, 0));
-      blob = encodeGIF(gifFrames, EXPORT_W, EXPORT_H, Math.round(1000 / FPS));
-      ext = 'gif';
+    }
+
+    if (cancelled) {
+      await exporter.cancel();
     } else {
-      ext = useMp4 ? 'mp4' : 'webm';
-      blob = useMp4
-        ? new Blob([encodeMP4(mp4Samples, EXPORT_W, EXPORT_H, mp4Description, MP4_TIMESCALE)], { type: 'video/mp4' })
-        : new Blob(chunks, { type: mimeType });
+      const result = await exporter.finish();
+      if (!cancelled) blob = result;
     }
+  } catch (error) {
+    await exporter.cancel().catch(() => {});
+    throw error;
+  } finally {
+    closeOverlay();
+  }
 
-    overlay.classList.add('hidden');
-    overlay.onclick = null;
-
-    if (blob) {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `comparison.${ext}`;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-  } else {
-    overlay.classList.add('hidden');
-    overlay.onclick = null;
+  if (blob) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `comparison.${exportPlugin.extension}`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 }
 
-// Extract the frame drawing logic for reuse in GIF encoding
 function drawExportFrame(ctx, panels, panelRects, frameRects, labelInfos, bgImg, bgColor, phoneBorderColor, titleColor, subtitleColor, font, w, h) {
   if (bgImg) {
     const ia = bgImg.width / bgImg.height;
@@ -664,55 +616,6 @@ function drawExportFrame(ctx, panels, panelRects, frameRects, labelInfos, bgImg,
       ctx.fillText(info.subtitle, info.x, y);
     }
   }
-}
-
-// ── MP4 encoding (WebCodecs) ──
-//
-// MediaRecorder is deliberately not used for MP4: it can only emit fragmented
-// MP4, which platform transcoders reject (see mp4-muxer.js). Encoding frames
-// ourselves also lets us pin the H.264 profile and set exact presentation
-// timestamps, neither of which MediaRecorder exposes.
-
-const MP4_CODEC = 'avc1.640028';  // H.264 High profile, level 4.0
-const MP4_TIMESCALE = 90000;      // divisible by 24, 30 and 60
-const VIDEO_BITRATE = 8_000_000;
-
-async function mp4EncoderSupported(width, height, fps) {
-  if (typeof VideoEncoder === 'undefined' || typeof VideoFrame === 'undefined') return false;
-  try {
-    const { supported } = await VideoEncoder.isConfigSupported({
-      codec: MP4_CODEC, width, height, bitrate: VIDEO_BITRATE, framerate: fps,
-    });
-    return !!supported;
-  } catch {
-    return false;
-  }
-}
-
-// Lazy-load MP4 muxer
-let _mp4MuxerLoaded = false;
-function loadMp4Muxer() {
-  if (_mp4MuxerLoaded) return Promise.resolve();
-  return new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = 'mp4-muxer.js';
-    s.onload = () => { _mp4MuxerLoaded = true; resolve(); };
-    s.onerror = reject;
-    document.head.appendChild(s);
-  });
-}
-
-// Lazy-load GIF encoder
-let _gifEncoderLoaded = false;
-function loadGifEncoder() {
-  if (_gifEncoderLoaded) return Promise.resolve();
-  return new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = 'gif-encoder.js';
-    s.onload = () => { _gifEncoderLoaded = true; resolve(); };
-    s.onerror = reject;
-    document.head.appendChild(s);
-  });
 }
 
 function roundRect(ctx, x, y, w, h, r) {
