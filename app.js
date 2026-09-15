@@ -498,19 +498,38 @@ async function exportCanvas() {
   const subtitleColor = getComputedStyle(document.documentElement).getPropertyValue('--color-label-subtitle').trim();
   const font = `-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif`;
 
-  // GIF: collect frames directly. Video: use MediaRecorder.
-  let recorder, stream, chunks = [], stopped, mimeType;
+  // GIF: collect frames directly. MP4: WebCodecs. WebM: MediaRecorder.
+  const useMp4 = exportFormat === 'mp4' && await mp4EncoderSupported(EXPORT_W, EXPORT_H, FPS);
+  let recorder, stream, chunks = [], stopped, mimeType, encoder;
+  const mp4Samples = [];
+  let mp4Description = null;
   if (isGif) {
     framesCurrent.textContent = 'Loading GIF encoder…';
     await loadGifEncoder();
+  } else if (useMp4) {
+    framesCurrent.textContent = 'Loading MP4 muxer…';
+    await loadMp4Muxer();
+    encoder = new VideoEncoder({
+      output: (chunk, meta) => {
+        if (meta?.decoderConfig?.description) mp4Description = meta.decoderConfig.description;
+        const data = new Uint8Array(chunk.byteLength);
+        chunk.copyTo(data);
+        mp4Samples.push({ data, duration: MP4_TIMESCALE / FPS, isKey: chunk.type === 'key' });
+      },
+      error: err => { throw err; },
+    });
+    encoder.configure({
+      codec: MP4_CODEC,
+      width: EXPORT_W,
+      height: EXPORT_H,
+      bitrate: VIDEO_BITRATE,
+      framerate: FPS,
+      avc: { format: 'avc' },  // length-prefixed NALs, as MP4 requires
+    });
   } else {
     stream = oc.captureStream(0);
-    const mimeTypes = {
-      webm: MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm',
-      mp4: MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : 'video/webm',
-    };
-    mimeType = mimeTypes[exportFormat] || 'video/webm';
-    recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 });
+    mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
+    recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: VIDEO_BITRATE });
     recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
     stopped = new Promise(r => { recorder.onstop = r; });
     recorder.start();
@@ -537,6 +556,19 @@ async function exportCanvas() {
 
     if (isGif) {
       gifFrames.push(ctx.getImageData(0, 0, EXPORT_W, EXPORT_H));
+    } else if (useMp4) {
+      // Timestamps come from the frame index rather than the wall clock, so
+      // the result is exactly FPS no matter how long each seek took.
+      const frame = new VideoFrame(oc, {
+        timestamp: Math.round(i * 1e6 / FPS),
+        duration: Math.round(1e6 / FPS),
+      });
+      encoder.encode(frame, { keyFrame: i % (FPS * 2) === 0 });
+      frame.close();
+      // Keep the encoder queue bounded so long exports don't balloon memory.
+      if (encoder.encodeQueueSize > 8) {
+        await new Promise(r => encoder.addEventListener('dequeue', r, { once: true }));
+      }
     } else {
       stream.getVideoTracks()[0].requestFrame?.();
     }
@@ -546,6 +578,10 @@ async function exportCanvas() {
   if (recorder) {
     recorder.stop();
     await stopped;
+  }
+  if (encoder) {
+    await encoder.flush();
+    encoder.close();
   }
 
   if (!cancelled) {
@@ -557,8 +593,10 @@ async function exportCanvas() {
       blob = encodeGIF(gifFrames, EXPORT_W, EXPORT_H, Math.round(1000 / FPS));
       ext = 'gif';
     } else {
-      ext = mimeType.startsWith('video/mp4') ? 'mp4' : 'webm';
-      blob = new Blob(chunks, { type: mimeType });
+      ext = useMp4 ? 'mp4' : 'webm';
+      blob = useMp4
+        ? new Blob([encodeMP4(mp4Samples, EXPORT_W, EXPORT_H, mp4Description, MP4_TIMESCALE)], { type: 'video/mp4' })
+        : new Blob(chunks, { type: mimeType });
     }
 
     overlay.classList.add('hidden');
@@ -626,6 +664,42 @@ function drawExportFrame(ctx, panels, panelRects, frameRects, labelInfos, bgImg,
       ctx.fillText(info.subtitle, info.x, y);
     }
   }
+}
+
+// ── MP4 encoding (WebCodecs) ──
+//
+// MediaRecorder is deliberately not used for MP4: it can only emit fragmented
+// MP4, which platform transcoders reject (see mp4-muxer.js). Encoding frames
+// ourselves also lets us pin the H.264 profile and set exact presentation
+// timestamps, neither of which MediaRecorder exposes.
+
+const MP4_CODEC = 'avc1.640028';  // H.264 High profile, level 4.0
+const MP4_TIMESCALE = 90000;      // divisible by 24, 30 and 60
+const VIDEO_BITRATE = 8_000_000;
+
+async function mp4EncoderSupported(width, height, fps) {
+  if (typeof VideoEncoder === 'undefined' || typeof VideoFrame === 'undefined') return false;
+  try {
+    const { supported } = await VideoEncoder.isConfigSupported({
+      codec: MP4_CODEC, width, height, bitrate: VIDEO_BITRATE, framerate: fps,
+    });
+    return !!supported;
+  } catch {
+    return false;
+  }
+}
+
+// Lazy-load MP4 muxer
+let _mp4MuxerLoaded = false;
+function loadMp4Muxer() {
+  if (_mp4MuxerLoaded) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'mp4-muxer.js';
+    s.onload = () => { _mp4MuxerLoaded = true; resolve(); };
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
 }
 
 // Lazy-load GIF encoder
