@@ -14,7 +14,7 @@ No build step or dependencies required. Serve the files with any static file ser
 Drop a before & after video (MP4, WebM, MOV) onto each panel to get started.
 
 **Layout controls**
-- **Frame style** — Choose between no frame, phone, or app (macOS window chrome) presentation.
+- **Frame style** — Choose between no frame, Generic Android, iPhone 17 Pro, or app (macOS window chrome) presentation. The iPhone 17 Pro frame crops videos to its fixed screen aspect ratio.
 - **Background** — Set a custom background image behind the video panels.
 - **Title / Subtitle** — Add editable labels above each video.
 - **Padding & Gap** — Drag the edge and divider handles to adjust spacing.

@@ -38,8 +38,8 @@
   --color-panel-bg: #fff;
   --color-panel-shadow: rgba(0,0,0,0.06);
 
-  /* Phone frame */
-  --color-phone-border: #c0bbb5;
+  /* Generic Android frame */
+  --color-generic-android-border: #c0bbb5;
 
   /* Grip handles */
   --color-grip: #ccc;
@@ -409,17 +409,51 @@ select {
 }
 
 
-/* ── Frame type: phone ── */
-.video-player-frame.frame-phone {
-  border: 4px solid var(--color-phone-border);
+/* ── Frame type: Generic Android ── */
+.video-player-frame.frame-generic-android {
+  border: 4px solid var(--color-generic-android-border);
   border-radius: 18px;
   background: var(--color-panel-bg);
   padding: 0;
   overflow: hidden;
 }
 
-.video-player-frame.frame-phone .video-frame canvas {
+.video-player-frame.frame-generic-android .video-frame canvas {
   border-radius: 16px;
+}
+
+/* ── Frame type: iPhone 17 Pro ── */
+.video-player-frame.loaded.frame-iphone-17-pro {
+  width: calc(var(--sizer-height, 100vh) * 448 / 916);
+  aspect-ratio: 448 / 916;
+  flex-shrink: 0;
+}
+
+.video-player-frame.frame-iphone-17-pro .video-frame {
+  position: absolute;
+  left: calc(24 / 448 * 100%);
+  top: calc(21 / 916 * 100%);
+  width: calc(402 / 448 * 100%);
+  height: calc(874 / 916 * 100%);
+  clip-path: url('#iphone-17-pro-screen-clip');
+}
+
+.video-player-frame.frame-iphone-17-pro .video-frame canvas {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  border-radius: 0;
+  object-fit: cover;
+}
+
+.video-player-frame.frame-iphone-17-pro::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: url('assets/iphone-17-pro-frame.svg') center / contain no-repeat;
+  pointer-events: none;
 }
 
 /* ── Frame type: app (macOS window chrome) ── */

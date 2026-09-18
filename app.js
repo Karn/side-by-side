@@ -15,6 +15,10 @@ const layoutState = {
 };
 
 const labelBaseSizes = { title: 14, subtitle: 12 };
+const IPHONE_17_PRO_FRAME_SRC = 'assets/iphone-17-pro-frame.svg';
+const IPHONE_17_PRO_SCREEN_WIDTH = 402;
+const IPHONE_17_PRO_SCREEN_HEIGHT = 874;
+const IPHONE_17_PRO_SCREEN_CLIP_PATH = new Path2D('M100.8 0C65.5166 0 47.8748 -0.0004 34.3984 6.8662C22.5442 12.9062 12.9062 22.5442 6.8662 34.3984C-0.0004 47.8749 0 65.5166 0 100.8V773.2C0 808.483 -0.0004 826.125 6.8662 839.602C12.9062 851.456 22.5442 861.094 34.3984 867.134C47.8749 874 65.5166 874 100.8 874H301.2C336.483 874 354.125 874 367.602 867.134C379.456 861.094 389.094 851.456 395.134 839.602C402 826.125 402 808.483 402 773.2V100.8C402 65.5166 402 47.8748 395.134 34.3984C389.094 22.5442 379.456 12.9062 367.602 6.8662C354.125 -0.0004 336.483 0 301.2 0H100.8Z');
 const labelScales = {
   s: 1,
   m: 1.25,
@@ -130,8 +134,9 @@ layoutFrameSelect.addEventListener('change', () => {
 
 function applyFrameType() {
   canvasEl.querySelectorAll('.video-player-frame').forEach((el) => {
-    el.classList.remove('frame-phone', 'frame-app');
-    if (layoutState.frame === 'phone') el.classList.add('frame-phone');
+    el.classList.remove('frame-generic-android', 'frame-iphone-17-pro', 'frame-app');
+    if (layoutState.frame === 'generic-android') el.classList.add('frame-generic-android');
+    else if (layoutState.frame === 'iphone-17-pro') el.classList.add('frame-iphone-17-pro');
     else if (layoutState.frame === 'app') el.classList.add('frame-app');
   });
 }
@@ -467,19 +472,23 @@ async function exportCanvas() {
     await new Promise(r => { bgImg.onload = r; });
   }
 
+  let iphone17ProFrameImg = null;
+  if (layoutState.frame === 'iphone-17-pro') {
+    iphone17ProFrameImg = new Image();
+    iphone17ProFrameImg.src = IPHONE_17_PRO_FRAME_SRC;
+    await iphone17ProFrameImg.decode();
+  }
+
   // Read positions directly from the on-screen layout (screen pixels)
   const panelRects = panels.map(p => {
     const r = p.canvas.getBoundingClientRect();
     return { x: r.left - canvasRect.left, y: r.top - canvasRect.top, w: r.width, h: r.height };
   });
 
-  const phoneBorder = 4;
-  const frameRects = panelRects.map(pr => ({
-    x: pr.x - phoneBorder,
-    y: pr.y - phoneBorder,
-    w: pr.w + phoneBorder * 2,
-    h: pr.h + phoneBorder * 2,
-  }));
+  const frameRects = panels.map(p => {
+    const r = p.frame.getBoundingClientRect();
+    return { x: r.left - canvasRect.left, y: r.top - canvasRect.top, w: r.width, h: r.height };
+  });
 
   const labelInfos = panels.map(p => {
     const labelEl = p.panel.querySelector('.panel-label');
@@ -504,7 +513,7 @@ async function exportCanvas() {
 
   // Read computed styles once
   const bgColor = getComputedStyle(canvasEl).backgroundColor;
-  const phoneBorderColor = getComputedStyle(document.documentElement).getPropertyValue('--color-phone-border').trim();
+  const genericAndroidBorderColor = getComputedStyle(document.documentElement).getPropertyValue('--color-generic-android-border').trim();
   const titleColor = getComputedStyle(document.documentElement).getPropertyValue('--color-label-title').trim();
   const subtitleColor = getComputedStyle(document.documentElement).getPropertyValue('--color-label-subtitle').trim();
   const font = `-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif`;
@@ -541,7 +550,7 @@ async function exportCanvas() {
         return new Promise(r => p.video.addEventListener('seeked', r, { once: true }));
       }));
 
-      drawExportFrame(ctx, panels, panelRects, frameRects, labelInfos, bgImg, bgColor, phoneBorderColor, titleColor, subtitleColor, font, canvasRect.width, canvasRect.height);
+      drawExportFrame(ctx, panels, panelRects, frameRects, labelInfos, bgImg, iphone17ProFrameImg, bgColor, genericAndroidBorderColor, titleColor, subtitleColor, font, canvasRect.width, canvasRect.height);
       await exporter.addFrame(i);
       await new Promise(r => setTimeout(r, 0));
     }
@@ -569,7 +578,7 @@ async function exportCanvas() {
   }
 }
 
-function drawExportFrame(ctx, panels, panelRects, frameRects, labelInfos, bgImg, bgColor, phoneBorderColor, titleColor, subtitleColor, font, w, h) {
+function drawExportFrame(ctx, panels, panelRects, frameRects, labelInfos, bgImg, iphone17ProFrameImg, bgColor, genericAndroidBorderColor, titleColor, subtitleColor, font, w, h) {
   if (bgImg) {
     const ia = bgImg.width / bgImg.height;
     const ca = w / h;
@@ -585,17 +594,30 @@ function drawExportFrame(ctx, panels, panelRects, frameRects, labelInfos, bgImg,
   for (let j = 0; j < panels.length; j++) {
     const pr = panelRects[j];
     const fr = frameRects[j];
-    if (layoutState.frame === 'phone') {
-      ctx.fillStyle = phoneBorderColor;
+    if (layoutState.frame === 'generic-android') {
+      ctx.fillStyle = genericAndroidBorderColor;
       roundRect(ctx, fr.x, fr.y, fr.w, fr.h, 18);
       ctx.fill();
     }
-    const radius = layoutState.frame === 'phone' ? 16 : 12;
-    ctx.save();
-    roundRect(ctx, pr.x, pr.y, pr.w, pr.h, radius);
-    ctx.clip();
-    ctx.drawImage(panels[j].video, pr.x, pr.y, pr.w, pr.h);
-    ctx.restore();
+    if (layoutState.frame === 'iphone-17-pro') {
+      ctx.save();
+      ctx.translate(pr.x, pr.y);
+      ctx.scale(pr.w / IPHONE_17_PRO_SCREEN_WIDTH, pr.h / IPHONE_17_PRO_SCREEN_HEIGHT);
+      ctx.clip(IPHONE_17_PRO_SCREEN_CLIP_PATH);
+      drawImageCover(ctx, panels[j].video, 0, 0, IPHONE_17_PRO_SCREEN_WIDTH, IPHONE_17_PRO_SCREEN_HEIGHT);
+      ctx.restore();
+    } else {
+      const radius = layoutState.frame === 'generic-android' ? 16 : 12;
+      ctx.save();
+      roundRect(ctx, pr.x, pr.y, pr.w, pr.h, radius);
+      ctx.clip();
+      ctx.drawImage(panels[j].video, pr.x, pr.y, pr.w, pr.h);
+      ctx.restore();
+    }
+
+    if (iphone17ProFrameImg) {
+      ctx.drawImage(iphone17ProFrameImg, fr.x, fr.y, fr.w, fr.h);
+    }
   }
 
   for (let j = 0; j < panels.length; j++) {
@@ -616,6 +638,27 @@ function drawExportFrame(ctx, panels, panelRects, frameRects, labelInfos, bgImg,
       ctx.fillText(info.subtitle, info.x, y);
     }
   }
+}
+
+function drawImageCover(ctx, image, x, y, w, h) {
+  const sourceW = image.videoWidth || image.width;
+  const sourceH = image.videoHeight || image.height;
+  const sourceRatio = sourceW / sourceH;
+  const targetRatio = w / h;
+  let sx = 0;
+  let sy = 0;
+  let sw = sourceW;
+  let sh = sourceH;
+
+  if (sourceRatio > targetRatio) {
+    sw = sourceH * targetRatio;
+    sx = (sourceW - sw) / 2;
+  } else {
+    sh = sourceW / targetRatio;
+    sy = (sourceH - sh) / 2;
+  }
+
+  ctx.drawImage(image, sx, sy, sw, sh, x, y, w, h);
 }
 
 function roundRect(ctx, x, y, w, h, r) {
