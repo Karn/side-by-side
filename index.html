@@ -16,61 +16,62 @@
   </defs>
 </svg>
 
-<div class="topbar-container">
-<div class="toolbar">
-  <div class="toolbar-group">
-    <select id="layout-frame-select" title="Frame style">
-      <option value="none" selected>No Frame</option>
-      <option value="generic-android">Generic Android</option>
-      <option value="iphone-17-pro">iPhone 17 Pro</option>
-      <option value="app">App</option>
-    </select>
-    <button id="btn-bg" type="button" title="Set background image" aria-pressed="false">Background</button>
-    <input type="file" id="layout-bg-input" accept="image/*" class="toolbar-hidden-input">
+<header class="topbar">
+  <div class="app-logo">
+    <span class="logo-icon">□■</span>
+    <span class="logo-text">SIDE-BY-SIDE</span>
   </div>
-  <div class="toolbar-group">
-    <button id="btn-title" type="button" aria-pressed="false">Title</button>
-    <button id="btn-subtitle" type="button" aria-pressed="false">Subtitle</button>
-    <select id="label-size-select" title="Title and subtitle size" aria-label="Title and subtitle size">
-      <option value="s" selected>Size: S</option>
-      <option value="m">Size: M</option>
-      <option value="l">Size: L</option>
-      <option value="xl">Size: XL</option>
-    </select>
-    <select id="label-position-select" title="Title and subtitle position" aria-label="Title and subtitle position">
-      <option value="top" selected>Position: Top</option>
-      <option value="bottom">Position: Bottom</option>
-      <option value="outer-sides">Position: Outer Sides</option>
-    </select>
+  <div class="toolbar" role="toolbar" aria-label="Canvas controls">
+    <div class="toolbar-group">
+      <select id="layout-frame-select" title="Frame style" aria-label="Frame style">
+        <option value="none" selected>No Frame</option>
+        <option value="generic-android">Generic Android</option>
+        <option value="iphone-17-pro">iPhone 17 Pro</option>
+        <option value="app">App</option>
+      </select>
+      <button id="btn-bg" type="button" title="Set background image" aria-pressed="false">Choose image</button>
+      <input type="file" id="layout-bg-input" accept="image/*" class="visually-hidden-input">
+    </div>
+    <span class="toolbar-divider" aria-hidden="true"></span>
+    <div class="toolbar-group">
+      <button id="btn-title" type="button" aria-pressed="false">Title</button>
+      <button id="btn-subtitle" type="button" aria-pressed="false">Subtitle</button>
+      <select id="label-size-select" title="Title and subtitle size" aria-label="Title and subtitle size">
+        <option value="s" selected>Small</option>
+        <option value="m">Medium</option>
+        <option value="l">Large</option>
+        <option value="xl">Extra large</option>
+      </select>
+      <select id="label-position-select" title="Title and subtitle position" aria-label="Title and subtitle position">
+        <option value="top" selected>Top</option>
+        <option value="bottom">Bottom</option>
+        <option value="outer-sides">Outer sides</option>
+      </select>
+    </div>
   </div>
-</div>
-<div class="app-logo">
-  <span class="logo-icon">□■</span>
-  <span class="logo-text">SIDE-BY-SIDE</span>
-</div>
-</div>
+</header>
 
-<div class="stage">
+<main class="stage">
   <div class="canvas" id="canvas">
     <div class="canvas-vpad-handle canvas-vpad-top"><div class="drag-grip"></div></div>
     <div class="canvas-middle">
     <div class="canvas-hpad-handle canvas-hpad-left"><div class="drag-grip"></div></div>
     <div class="panel-slot active" id="panel-left" tabindex="0">
-      <div class="drop-zone">
-        <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5">
-          <rect x="6" y="10" width="36" height="28" rx="3"/>
-          <polygon points="20,17 20,31 32,24"/>
-        </svg>
-        <div class="drop-label">Drop video</div>
-        <div class="drop-formats">MP4, WebM, MOV</div>
-        <input type="file" accept="video/*">
-      </div>
       <div class="panel-content">
         <div class="panel-label hidden">
           <input type="text" class="label-title-input hidden" placeholder="Before">
           <input type="text" class="label-subtitle-input hidden" placeholder="Add subtitle...">
         </div>
         <div class="video-sizer">
+          <div class="drop-zone">
+            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="6" y="10" width="36" height="28" rx="3"/>
+              <polygon points="20,17 20,31 32,24"/>
+            </svg>
+            <div class="drop-label">Drop video</div>
+            <div class="drop-formats">MP4, WebM, MOV</div>
+            <input type="file" accept="video/*">
+          </div>
           <div class="video-player-frame">
             <div class="app-titlebar">
               <div class="app-titlebar-dots">
@@ -97,21 +98,21 @@
       <div class="divider-handle"><div class="drag-grip"></div></div>
     </div>
     <div class="panel-slot" id="panel-right" tabindex="0">
-      <div class="drop-zone">
-        <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5">
-          <rect x="6" y="10" width="36" height="28" rx="3"/>
-          <polygon points="20,17 20,31 32,24"/>
-        </svg>
-        <div class="drop-label">Drop video</div>
-        <div class="drop-formats">MP4, WebM, MOV</div>
-        <input type="file" accept="video/*">
-      </div>
       <div class="panel-content">
         <div class="panel-label hidden">
           <input type="text" class="label-title-input hidden" placeholder="After">
           <input type="text" class="label-subtitle-input hidden" placeholder="Add subtitle...">
         </div>
         <div class="video-sizer">
+          <div class="drop-zone">
+            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="6" y="10" width="36" height="28" rx="3"/>
+              <polygon points="20,17 20,31 32,24"/>
+            </svg>
+            <div class="drop-label">Drop video</div>
+            <div class="drop-formats">MP4, WebM, MOV</div>
+            <input type="file" accept="video/*">
+          </div>
           <div class="video-player-frame">
             <div class="app-titlebar">
               <div class="app-titlebar-dots">
@@ -138,23 +139,22 @@
     </div>
     <div class="canvas-vpad-handle canvas-vpad-bottom"><div class="drag-grip"></div></div>
   </div>
-</div>
+</main>
 
-<div class="bottombar">
-  <div class="toolbar-group">
-    <button id="btn-play">Play [Space]</button>
-    <select id="speed" title="Playback speed">
-      <option value="0.25">Speed: 0.25x</option>
-      <option value="0.5">Speed: 0.5x</option>
-      <option value="1" selected>Speed: 1x</option>
-      <option value="1.5">Speed: 1.5x</option>
-      <option value="2">Speed: 2x</option>
+<footer class="bottombar">
+  <div class="bottom-controls">
+    <button id="btn-play"><span class="button-label">Play</span><kbd>Space</kbd></button>
+    <select id="speed" aria-label="Playback speed" data-dropdown-placement="top">
+      <option value="0.25">0.25x Speed</option>
+      <option value="0.5">0.5x Speed</option>
+      <option value="1" selected>1x Speed</option>
+      <option value="1.5">1.5x Speed</option>
+      <option value="2">2x Speed</option>
     </select>
+    <span class="rail-divider" aria-hidden="true"></span>
+    <button id="btn-export" class="filled" title="Export trimmed clip from active panel [E]">Export <kbd>E</kbd></button>
   </div>
-  <div class="toolbar-group">
-    <button id="btn-export" title="Export trimmed clip from active panel [E]">Export [E]</button>
-  </div>
-</div>
+</footer>
 
 
 <div class="export-overlay hidden" id="export-overlay">
@@ -170,19 +170,19 @@
       </div>
       <div class="export-setting-row">
         <span class="export-setting-label">Frame Rate</span>
-        <select class="export-format-select" id="export-fps">
+        <select class="export-format-select" id="export-fps" aria-label="Frame rate">
           <option value="24">24 fps</option>
           <option value="30" selected>30 fps</option>
           <option value="60">60 fps</option>
         </select>
       </div>
       <div class="export-controls-row">
-        <select class="export-format-select" id="export-format">
+        <select class="export-format-select" id="export-format" aria-label="Export format">
           <option value="webm" selected>WebM</option>
           <option value="mp4">MP4</option>
           <option value="gif">GIF</option>
         </select>
-        <button class="export-action-btn">Export</button>
+        <button class="export-action-btn filled" type="button">Export</button>
       </div>
     </div>
   </div>

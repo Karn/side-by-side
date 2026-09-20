@@ -38,11 +38,6 @@ const rightPanel = new VideoPanel(
 );
 let playing = false;
 
-const toolbarEl = document.querySelector('.toolbar');
-const bottombarEl = document.querySelector('.bottombar');
-toolbarEl.classList.add('hidden');
-bottombarEl.classList.add('hidden');
-
 function applyCanvasPadding() {
   canvasEl.querySelector('.canvas-vpad-top').style.height = layoutState.canvasPaddingTop + 'px';
   canvasEl.querySelector('.canvas-vpad-bottom').style.height = layoutState.canvasPaddingBottom + 'px';
@@ -51,15 +46,8 @@ function applyCanvasPadding() {
   resizeCanvas();
 }
 
-function updateBarsVisibility() {
-  const hasVideo = leftPanel.loaded || rightPanel.loaded;
-  toolbarEl.classList.toggle('hidden', !hasVideo);
-  bottombarEl.classList.toggle('hidden', !hasVideo);
-  if (hasVideo) applyCanvasPadding();
-}
-
-leftPanel.onLoad = updateBarsVisibility;
-rightPanel.onLoad = updateBarsVisibility;
+leftPanel.onLoad = applyCanvasPadding;
+rightPanel.onLoad = applyCanvasPadding;
 
 // ── Canvas sizing (16:9 export surface) ──
 
@@ -67,9 +55,9 @@ const stageEl = document.querySelector('.stage');
 const canvasEl = document.getElementById('canvas');
 
 function resizeCanvas() {
-  const stagePad = 8; // matches .stage padding
-  const availW = stageEl.clientWidth - stagePad * 2;
-  const availH = stageEl.clientHeight - stagePad * 2;
+  const stageStyle = getComputedStyle(stageEl);
+  const availW = stageEl.clientWidth - parseFloat(stageStyle.paddingLeft) - parseFloat(stageStyle.paddingRight);
+  const availH = stageEl.clientHeight - parseFloat(stageStyle.paddingTop) - parseFloat(stageStyle.paddingBottom);
   let cw = availW;
   let ch = availW * 9 / 16;
   if (ch > availH) {
@@ -94,9 +82,163 @@ canvasEl.querySelectorAll('.video-sizer').forEach(s => sizerObserver.observe(s))
 // Set initial padding element sizes + canvas dimensions
 applyCanvasPadding();
 
-// ── Toolbar ──
+// ── Dropdowns ──
+
+const dropdownControls = [...document.querySelectorAll('select')].map(createDropdown);
+
+function createDropdown(select) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'dropdown';
+  wrapper.dataset.dropdownFor = select.id;
+  if (select.dataset.dropdownPlacement) {
+    wrapper.dataset.dropdownPlacement = select.dataset.dropdownPlacement;
+  }
+
+  select.before(wrapper);
+  wrapper.append(select);
+  select.hidden = true;
+  select.setAttribute('aria-hidden', 'true');
+  select.tabIndex = -1;
+
+  const trigger = document.createElement('button');
+  trigger.id = `${select.id}-trigger`;
+  trigger.className = 'dropdown-trigger';
+  trigger.type = 'button';
+  trigger.setAttribute('aria-haspopup', 'listbox');
+  trigger.setAttribute('aria-expanded', 'false');
+  trigger.setAttribute('aria-controls', `${select.id}-menu`);
+  const accessibleName = select.getAttribute('aria-label') || select.title;
+  if (accessibleName) trigger.setAttribute('aria-label', accessibleName);
+  if (select.title) trigger.title = select.title;
+
+  const triggerLabel = document.createElement('span');
+  triggerLabel.className = 'dropdown-trigger-label';
+  trigger.append(triggerLabel);
+
+  const menu = document.createElement('div');
+  menu.id = `${select.id}-menu`;
+  menu.className = 'dropdown-menu';
+  menu.hidden = true;
+  menu.setAttribute('role', 'listbox');
+  if (accessibleName) menu.setAttribute('aria-label', accessibleName);
+
+  const options = [...select.options].map(nativeOption => {
+    const option = document.createElement('button');
+    option.className = 'dropdown-option';
+    option.type = 'button';
+    option.setAttribute('role', 'option');
+    option.dataset.value = nativeOption.value;
+    option.textContent = nativeOption.textContent;
+    option.disabled = nativeOption.disabled;
+    menu.append(option);
+    return option;
+  });
+
+  wrapper.append(trigger, menu);
+
+  const close = () => {
+    menu.hidden = true;
+    trigger.setAttribute('aria-expanded', 'false');
+  };
+
+  const open = (focusSelectedOption = true) => {
+    dropdownControls.forEach(control => {
+      if (control.wrapper !== wrapper) control.close();
+    });
+    menu.hidden = false;
+    trigger.setAttribute('aria-expanded', 'true');
+    if (focusSelectedOption) {
+      const selectedIndex = Math.max(0, select.selectedIndex);
+      options[selectedIndex]?.focus();
+    }
+  };
+
+  const update = () => {
+    const selectedIndex = Math.max(0, select.selectedIndex);
+    triggerLabel.textContent = select.options[selectedIndex]?.textContent ?? '';
+    trigger.disabled = select.disabled;
+    options.forEach((option, index) => {
+      option.setAttribute('aria-selected', index === selectedIndex ? 'true' : 'false');
+      option.disabled = select.options[index].disabled;
+    });
+    if (select.disabled) close();
+  };
+
+  trigger.addEventListener('click', event => {
+    if (menu.hidden) {
+      open(event.detail === 0);
+    } else {
+      close();
+      if (event.detail > 0) trigger.blur();
+    }
+  });
+  trigger.addEventListener('keydown', event => {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+    event.preventDefault();
+    open();
+  });
+  options.forEach((option, index) => {
+    option.addEventListener('click', event => {
+      select.selectedIndex = index;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      close();
+      if (event.detail === 0) {
+        trigger.focus();
+      } else if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+    });
+  });
+  menu.addEventListener('keydown', event => {
+    const enabledOptions = options.filter(option => !option.disabled);
+    const currentIndex = enabledOptions.indexOf(document.activeElement);
+    let nextIndex = currentIndex;
+
+    if (event.key === 'ArrowDown') nextIndex = (currentIndex + 1) % enabledOptions.length;
+    else if (event.key === 'ArrowUp') nextIndex = (currentIndex - 1 + enabledOptions.length) % enabledOptions.length;
+    else if (event.key === 'Home') nextIndex = 0;
+    else if (event.key === 'End') nextIndex = enabledOptions.length - 1;
+    else if (event.key === 'Escape') {
+      event.preventDefault();
+      close();
+      trigger.focus();
+      return;
+    } else {
+      return;
+    }
+
+    event.preventDefault();
+    enabledOptions[nextIndex]?.focus();
+  });
+  wrapper.addEventListener('focusout', () => {
+    requestAnimationFrame(() => {
+      if (!wrapper.contains(document.activeElement)) close();
+    });
+  });
+  select.addEventListener('change', update);
+  new MutationObserver(update).observe(select, {
+    attributes: true,
+    attributeFilter: ['disabled'],
+  });
+
+  update();
+  return { wrapper, trigger, close };
+}
+
+document.addEventListener('pointerdown', event => {
+  dropdownControls.forEach(control => {
+    if (control.wrapper.contains(event.target)) return;
+    control.close();
+    requestAnimationFrame(() => {
+      if (document.activeElement === control.trigger) control.trigger.blur();
+    });
+  });
+});
+
+// ── Bottom rail ──
 
 const btnPlay = document.getElementById('btn-play');
+const btnPlayLabel = btnPlay.querySelector('.button-label');
 const btnExport = document.getElementById('btn-export');
 const speedSel = document.getElementById('speed');
 
@@ -162,6 +304,7 @@ function applyLayoutBg() {
   btnBg.classList.toggle('on', hasBackground);
   btnBg.setAttribute('aria-pressed', hasBackground);
   btnBg.title = hasBackground ? 'Clear background image' : 'Set background image';
+  btnBg.textContent = hasBackground ? 'Remove image' : 'Choose image';
 
   if (layoutState.bgImage) {
     canvasEl.style.backgroundImage = `url(${layoutState.bgImage})`;
@@ -302,7 +445,7 @@ function togglePlay() { playing ? stopPlay() : startPlay(); }
 function startPlay() {
   if (!leftPanel.loaded && !rightPanel.loaded) return;
   playing = true;
-  btnPlay.textContent = 'Pause [Space]';
+  btnPlayLabel.textContent = 'Pause';
   btnPlay.classList.add('on');
   applySpeed();
 
@@ -315,7 +458,7 @@ function startPlay() {
 
 function stopPlay() {
   playing = false;
-  btnPlay.textContent = 'Play [Space]';
+  btnPlayLabel.textContent = 'Play';
   btnPlay.classList.remove('on');
   leftPanel.pause(); rightPanel.pause();
   leftPanel.stopRendering(); rightPanel.stopRendering();
@@ -674,10 +817,22 @@ function roundRect(ctx, x, y, w, h, r) {
 // ── Keyboard ──
 
 document.addEventListener('keydown', (e) => {
-  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  const target = e.target instanceof Element ? e.target : null;
+  if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+  if (document.querySelector('.dropdown-menu:not([hidden])')) return;
   if (!document.getElementById('export-overlay').classList.contains('hidden')) return;
+  if (e.repeat) return;
 
   switch (e.code) {
-    case 'Space': e.preventDefault(); togglePlay(); break;
+    case 'Space':
+      if (target?.closest('button, [role="option"]')) return;
+      e.preventDefault();
+      togglePlay();
+      break;
+    case 'KeyE':
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      e.preventDefault();
+      void exportCanvas();
+      break;
   }
 });
