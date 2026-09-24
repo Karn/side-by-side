@@ -302,7 +302,7 @@ input[type="number"]:active:not(:disabled) {
 button.on { background: var(--color-btn-on-bg); border-color: var(--color-btn-on-border); color: var(--color-btn-on-text); }
 
 .workspace-dots {
-  opacity: 0.1;
+  opacity: 0.45;
   position: fixed;
   inset: 0;
   width: 100%;
