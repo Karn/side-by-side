@@ -1,6 +1,7 @@
 :root {
   /* Page */
   --color-page-bg: #f7f7f4;
+  --color-workspace-dot: #deded8;
   --color-text: #26251e;
 
   /* Canvas */
@@ -69,6 +70,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
+  isolation: isolate;
   background: var(--color-page-bg);
   color: var(--color-text);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
@@ -298,6 +300,16 @@ input[type="number"]:active:not(:disabled) {
 }
 
 button.on { background: var(--color-btn-on-bg); border-color: var(--color-btn-on-border); color: var(--color-btn-on-text); }
+
+.workspace-dots {
+  opacity: 0.1;
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: -1;
+}
 
 /* ── Stage (viewport area) ── */
 .stage {

@@ -82,6 +82,84 @@ canvasEl.querySelectorAll('.video-sizer').forEach(s => sizerObserver.observe(s))
 // Set initial padding element sizes + canvas dimensions
 applyCanvasPadding();
 
+// ── Workspace dots ──
+
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+const dotCanvas = document.createElement('canvas');
+dotCanvas.className = 'workspace-dots';
+dotCanvas.setAttribute('aria-hidden', 'true');
+document.body.prepend(dotCanvas);
+const dotContext = dotCanvas.getContext('2d');
+const dotColor = getComputedStyle(document.documentElement).getPropertyValue('--color-workspace-dot').trim();
+const dotRippleRadius = 120;
+let dotWaves = [];
+let dotAnimation = 0;
+let dotWidth = 0;
+let dotHeight = 0;
+
+function drawWorkspaceDots(now) {
+  dotAnimation = 0;
+  dotWaves = dotWaves.filter(wave => now - wave.start < wave.duration);
+  dotContext.clearRect(0, 0, dotWidth, dotHeight);
+  dotContext.fillStyle = dotColor;
+  dotContext.beginPath();
+  for (let y = 12; y < dotHeight; y += 24) {
+    for (let x = 12; x < dotWidth; x += 24) {
+      let offsetX = 0;
+      let offsetY = 0;
+      for (const wave of dotWaves) {
+        const dx = x - wave.x;
+        const dy = y - wave.y;
+        const distance = Math.hypot(dx, dy);
+        const age = now - wave.start;
+        const phase = (distance - age * 0.24) / 18;
+        if (distance === 0 || distance >= dotRippleRadius || Math.abs(phase) > 3) continue;
+        const displacement = Math.sin(phase * Math.PI) * Math.exp(-phase * phase)
+          * 8 * (1 - distance / dotRippleRadius) * (1 - age / wave.duration);
+        offsetX += dx / distance * displacement;
+        offsetY += dy / distance * displacement;
+      }
+      dotContext.rect(x + offsetX - 2.5, y + offsetY - 0.5, 5, 1);
+      dotContext.rect(x + offsetX - 0.5, y + offsetY - 2.5, 1, 5);
+    }
+  }
+  dotContext.fill();
+  if (dotWaves.length) dotAnimation = requestAnimationFrame(drawWorkspaceDots);
+}
+
+function resizeWorkspaceDots() {
+  dotWidth = window.innerWidth;
+  dotHeight = window.innerHeight;
+  const scale = window.devicePixelRatio || 1;
+  dotCanvas.width = Math.round(dotWidth * scale);
+  dotCanvas.height = Math.round(dotHeight * scale);
+  dotContext.setTransform(scale, 0, 0, scale, 0, 0);
+  cancelAnimationFrame(dotAnimation);
+  drawWorkspaceDots(performance.now());
+}
+
+window.addEventListener('resize', resizeWorkspaceDots);
+reducedMotion.addEventListener('change', () => {
+  dotWaves = [];
+  cancelAnimationFrame(dotAnimation);
+  drawWorkspaceDots(performance.now());
+});
+resizeWorkspaceDots();
+
+document.querySelectorAll('.topbar, .bottombar').forEach(rail => {
+  rail.addEventListener('click', event => {
+    const button = event.target.closest('button');
+    if (!button || button.disabled || reducedMotion.matches) return;
+
+    const bounds = button.getBoundingClientRect();
+    const x = event.detail ? event.clientX : bounds.left + bounds.width / 2;
+    const y = event.detail ? event.clientY : bounds.top + bounds.height / 2;
+    dotWaves = dotWaves.slice(-5);
+    dotWaves.push({ x, y, start: performance.now(), duration: 650 });
+    if (!dotAnimation) dotAnimation = requestAnimationFrame(drawWorkspaceDots);
+  }, { capture: true });
+});
+
 // ── Dropdowns ──
 
 const dropdownControls = [...document.querySelectorAll('select')].map(createDropdown);
