@@ -28,6 +28,7 @@ class VideoPanel {
     this.video.playsInline = true;
     this.video.preload = 'auto';
     this.loaded = false;
+    this.renderSuspended = false;
     this.file = null;
     this.inPoint = null;
     this.outPoint = null;
@@ -122,7 +123,7 @@ class VideoPanel {
   // ── Frame rendering ──
 
   _drawFrame() {
-    if (!this.loaded) return;
+    if (!this.loaded || this.renderSuspended) return;
     // Enforce playback range
     if (!this.video.paused) {
       const end = this.outPoint ?? this.video.duration;

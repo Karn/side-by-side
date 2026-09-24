@@ -1,75 +1,86 @@
 (() => {
-  const VIDEO_BITRATE = 8_000_000;
+  function encoderConfig(width, height, fps) {
+    return {
+      codec: 'vp8',
+      width,
+      height,
+      bitrate: 8_000_000,
+      framerate: fps,
+      latencyMode: 'realtime',
+    };
+  }
 
   ExportPlugins.register('webm', {
     extension: 'webm',
     outputSize: { width: 1920, height: 1080 },
+    fallback: 'gif',
 
-    async createSession({ canvas }) {
-      const stream = canvas.captureStream(0);
-      const videoTrack = stream.getVideoTracks()[0];
-      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
-        ? 'video/webm;codecs=vp9'
-        : 'video/webm';
-      const recorder = new MediaRecorder(stream, {
-        mimeType,
-        videoBitsPerSecond: VIDEO_BITRATE,
+    async isSupported({ width, height, fps }) {
+      if (typeof VideoEncoder === 'undefined' || typeof VideoFrame === 'undefined') return false;
+      try {
+        const { supported } = await VideoEncoder.isConfigSupported(encoderConfig(width, height, fps));
+        return Boolean(supported);
+      } catch {
+        return false;
+      }
+    },
+
+    async createSession({ canvas, width, height, fps, setStatus }) {
+      setStatus('Loading WebM muxer…');
+      await ExportPlugins.loadScript('exporters/webm-muxer.js', () => typeof encodeWebM === 'function');
+
+      const samples = [];
+      let encoderError = null;
+      const encoder = new VideoEncoder({
+        output: chunk => {
+          const data = new Uint8Array(chunk.byteLength);
+          chunk.copyTo(data);
+          samples.push({ data, timestamp: chunk.timestamp, isKey: chunk.type === 'key' });
+        },
+        error: error => { encoderError = error; },
       });
-      const chunks = [];
-      let recorderError = null;
-      const recordingStopped = new Promise(resolve => {
-        recorder.ondataavailable = event => {
-          if (event.data.size) chunks.push(event.data);
-        };
-        recorder.onstop = resolve;
-        recorder.onerror = event => {
-          recorderError = event.error ?? new Error('WebM recording failed');
-          resolve();
-        };
-      });
+
+      function closeEncoder() {
+        if (encoder.state !== 'closed') encoder.close();
+      }
 
       try {
-        recorder.start();
+        encoder.configure(encoderConfig(width, height, fps));
       } catch (error) {
-        stream.getTracks().forEach(track => track.stop());
+        closeEncoder();
         throw error;
       }
 
-      let stopping;
-      function stop() {
-        if (!stopping) {
-          stopping = (async () => {
-            try {
-              if (recorder.state !== 'inactive') recorder.stop();
-              await recordingStopped;
-              if (recorderError) throw recorderError;
-            } finally {
-              stream.getTracks().forEach(track => track.stop());
-            }
-          })();
-        }
-        return stopping;
-      }
-
       return {
-        addFrame() {
-          if (recorderError) throw recorderError;
-          videoTrack.requestFrame?.();
+        async addFrame(index) {
+          if (encoderError) throw encoderError;
+          // Frame timestamps follow the output timeline, independent of seek and encode latency.
+          const frame = new VideoFrame(canvas, {
+            timestamp: Math.round(index * 1e6 / fps),
+            duration: Math.round(1e6 / fps),
+          });
+          try {
+            encoder.encode(frame, { keyFrame: index % (fps * 2) === 0 });
+          } finally {
+            frame.close();
+          }
+          if (encoder.encodeQueueSize >= 8) await encoder.flush();
+          if (encoderError) throw encoderError;
         },
         async finish() {
           try {
-            await stop();
-            return new Blob(chunks, { type: mimeType });
+            await encoder.flush();
+            if (encoderError) throw encoderError;
+            setStatus('Muxing WebM…');
+            return encodeWebM(samples, width, height, fps);
           } finally {
-            chunks.length = 0;
+            closeEncoder();
+            samples.length = 0;
           }
         },
         async cancel() {
-          try {
-            await stop();
-          } finally {
-            chunks.length = 0;
-          }
+          closeEncoder();
+          samples.length = 0;
         },
       };
     },

@@ -82,15 +82,16 @@ canvasEl.querySelectorAll('.video-sizer').forEach(s => sizerObserver.observe(s))
 // Set initial padding element sizes + canvas dimensions
 applyCanvasPadding();
 
-// ── Workspace dots ──
+// ── Workspace grid ──
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-const dotCanvas = document.createElement('canvas');
-dotCanvas.className = 'workspace-dots';
-dotCanvas.setAttribute('aria-hidden', 'true');
-document.body.prepend(dotCanvas);
-const dotContext = dotCanvas.getContext('2d');
-const dotColor = getComputedStyle(document.documentElement).getPropertyValue('--color-workspace-dot').trim();
+const dotGrid = document.createElement('div');
+dotGrid.className = 'workspace-dots';
+dotGrid.setAttribute('aria-hidden', 'true');
+document.body.prepend(dotGrid);
+let dotCanvas;
+let dotContext;
+let dotColor;
 const dotRippleRadius = 120;
 let dotWaves = [];
 let dotAnimation = 0;
@@ -100,6 +101,8 @@ let dotHeight = 0;
 function drawWorkspaceDots(now) {
   dotAnimation = 0;
   dotWaves = dotWaves.filter(wave => now - wave.start < wave.duration);
+  dotGrid.classList.toggle('animating', dotWaves.length > 0);
+  if (!dotWaves.length) return;
   dotContext.clearRect(0, 0, dotWidth, dotHeight);
   dotContext.fillStyle = dotColor;
   dotContext.beginPath();
@@ -128,6 +131,7 @@ function drawWorkspaceDots(now) {
 }
 
 function resizeWorkspaceDots() {
+  if (!dotCanvas) return;
   dotWidth = window.innerWidth;
   dotHeight = window.innerHeight;
   const scale = window.devicePixelRatio || 1;
@@ -144,12 +148,19 @@ reducedMotion.addEventListener('change', () => {
   cancelAnimationFrame(dotAnimation);
   drawWorkspaceDots(performance.now());
 });
-resizeWorkspaceDots();
 
 document.querySelectorAll('.topbar, .bottombar').forEach(rail => {
   rail.addEventListener('click', event => {
     const button = event.target.closest('button');
     if (!button || button.disabled || reducedMotion.matches) return;
+
+    if (!dotCanvas) {
+      dotCanvas = document.createElement('canvas');
+      dotGrid.append(dotCanvas);
+      dotContext = dotCanvas.getContext('2d');
+      dotColor = getComputedStyle(dotGrid).getPropertyValue('--color-workspace-dot').trim();
+      resizeWorkspaceDots();
+    }
 
     const bounds = button.getBoundingClientRect();
     const x = event.detail ? event.clientX : bounds.left + bounds.width / 2;
@@ -755,6 +766,7 @@ async function exportCanvas() {
   }
 
   let blob = null;
+  panels.forEach(panel => { panel.renderSuspended = true; });
   try {
     for (let i = 0; i < totalFrames && !cancelled; i++) {
       const t = i * FRAME_DUR * exportSpeed;
@@ -786,6 +798,10 @@ async function exportCanvas() {
     await exporter.cancel().catch(() => {});
     throw error;
   } finally {
+    panels.forEach(panel => {
+      panel.renderSuspended = false;
+      panel._drawFrame();
+    });
     closeOverlay();
   }
 

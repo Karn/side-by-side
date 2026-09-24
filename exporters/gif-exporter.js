@@ -6,24 +6,18 @@
 
     async createSession({ context, width, height, fps, setStatus }) {
       setStatus('Loading GIF encoder…');
-      await ExportPlugins.loadScript('exporters/gif-encoder.js', () => typeof encodeGIF === 'function');
+      await ExportPlugins.loadScript('exporters/gif-encoder.js', () => typeof createGIFEncoder === 'function');
 
-      const frames = [];
+      const encoder = createGIFEncoder(width, height, Math.round(1000 / fps));
       return {
         addFrame() {
-          frames.push(context.getImageData(0, 0, width, height));
+          encoder.addFrame(context.getImageData(0, 0, width, height));
         },
         async finish() {
-          setStatus('Encoding GIF…');
-          await new Promise(resolve => setTimeout(resolve, 0));
-          try {
-            return encodeGIF(frames, width, height, Math.round(1000 / fps));
-          } finally {
-            frames.length = 0;
-          }
+          return encoder.finish();
         },
         async cancel() {
-          frames.length = 0;
+          encoder.cancel();
         },
       };
     },

@@ -1,73 +1,94 @@
 // Minimal GIF89a encoder with median-cut quantization and Floyd-Steinberg dithering
 
 function encodeGIF(frames, w, h, delayMs) {
+  const encoder = createGIFEncoder(w, h, delayMs);
+  for (const frame of frames) encoder.addFrame(frame);
+  return encoder.finish();
+}
+
+function createGIFEncoder(w, h, delayMs) {
   const delay = Math.round(delayMs / 10); // GIF delay is in centiseconds
   const buf = [];
+  const chunks = [];
+  let palette;
   const write = (b) => buf.push(b);
   const writeBytes = (arr) => arr.forEach(b => buf.push(b));
   const writeStr = (s) => { for (let i = 0; i < s.length; i++) buf.push(s.charCodeAt(i)); };
   const u16le = (v) => [v & 0xff, (v >> 8) & 0xff];
 
-  // Build adaptive palette from the first frame via median cut
-  const palette = buildPalette(frames[0].data, w, h);
-  const palFlat = new Uint8Array(256 * 3);
-  for (let i = 0; i < 256; i++) {
-    palFlat[i * 3] = palette[i][0];
-    palFlat[i * 3 + 1] = palette[i][1];
-    palFlat[i * 3 + 2] = palette[i][2];
-  }
+  function initialize(frame) {
+    // Build adaptive palette from the first frame via median cut
+    palette = buildPalette(frame.data, w, h);
+    const palFlat = new Uint8Array(256 * 3);
+    for (let i = 0; i < 256; i++) {
+      palFlat[i * 3] = palette[i][0];
+      palFlat[i * 3 + 1] = palette[i][1];
+      palFlat[i * 3 + 2] = palette[i][2];
+    }
 
-  // Header
-  writeStr('GIF89a');
-  writeBytes(u16le(w));
-  writeBytes(u16le(h));
-  write(0xf7); // GCT flag, 8-bit color, 256 colors
-  write(0);    // bg color index
-  write(0);    // pixel aspect ratio
-
-  // Global color table
-  for (let i = 0; i < 256 * 3; i++) write(palFlat[i]);
-
-  // Netscape extension for looping
-  write(0x21); write(0xff); write(11);
-  writeStr('NETSCAPE2.0');
-  write(3); write(1); writeBytes(u16le(0)); // loop forever
-  write(0);
-
-  for (const frame of frames) {
-    const indexed = quantizeFrame(frame.data, w, h, palette);
-
-    // Graphic control extension
-    write(0x21); write(0xf9); write(4);
-    write(0x00); // no transparency
-    writeBytes(u16le(delay));
-    write(0); // transparent color index
-    write(0);
-
-    // Image descriptor
-    write(0x2c);
-    writeBytes(u16le(0)); // left
-    writeBytes(u16le(0)); // top
+    // Header
+    writeStr('GIF89a');
     writeBytes(u16le(w));
     writeBytes(u16le(h));
-    write(0x00); // no local color table
+    write(0xf7); // GCT flag, 8-bit color, 256 colors
+    write(0);    // bg color index
+    write(0);    // pixel aspect ratio
 
-    // LZW compressed data
-    const lzwMin = 8;
-    const compressed = lzwEncode(indexed, lzwMin);
-    write(lzwMin);
-    let offset = 0;
-    while (offset < compressed.length) {
-      const size = Math.min(255, compressed.length - offset);
-      write(size);
-      for (let i = 0; i < size; i++) write(compressed[offset + i]);
-      offset += size;
-    }
-    write(0); // block terminator
+    // Global color table
+    for (let i = 0; i < 256 * 3; i++) write(palFlat[i]);
+
+    // Netscape extension for looping
+    write(0x21); write(0xff); write(11);
+    writeStr('NETSCAPE2.0');
+    write(3); write(1); writeBytes(u16le(0)); // loop forever
+    write(0);
   }
 
-  write(0x3b); // trailer
-  return new Blob([new Uint8Array(buf)], { type: 'image/gif' });
+  return {
+    addFrame(frame) {
+      if (!palette) initialize(frame);
+      const indexed = quantizeFrame(frame.data, w, h, palette);
+
+      // Graphic control extension
+      write(0x21); write(0xf9); write(4);
+      write(0x00); // no transparency
+      writeBytes(u16le(delay));
+      write(0); // transparent color index
+      write(0);
+
+      // Image descriptor
+      write(0x2c);
+      writeBytes(u16le(0)); // left
+      writeBytes(u16le(0)); // top
+      writeBytes(u16le(w));
+      writeBytes(u16le(h));
+      write(0x00); // no local color table
+
+      // LZW compressed data
+      const lzwMin = 8;
+      const compressed = lzwEncode(indexed, lzwMin);
+      write(lzwMin);
+      let offset = 0;
+      while (offset < compressed.length) {
+        const size = Math.min(255, compressed.length - offset);
+        write(size);
+        for (let i = 0; i < size; i++) write(compressed[offset + i]);
+        offset += size;
+      }
+      write(0); // block terminator
+      chunks.push(new Uint8Array(buf));
+      buf.length = 0;
+    },
+    finish() {
+      const blob = new Blob([...chunks, new Uint8Array([0x3b])], { type: 'image/gif' });
+      chunks.length = 0;
+      return blob;
+    },
+    cancel() {
+      chunks.length = 0;
+      buf.length = 0;
+    },
+  };
 }
 
 // Median-cut: builds an adaptive 256-color palette from actual pixel data
@@ -125,7 +146,7 @@ function quantizeFrame(data, w, h, palette) {
     px[i * 3 + 2] = data[i * 4 + 2];
   }
 
-  const cache = new Map();
+  const cache = new Int16Array(32768).fill(-1);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = y * w + x;
@@ -135,10 +156,8 @@ function quantizeFrame(data, w, h, palette) {
 
       // Nearest palette color (cached by 5-bit-truncated key)
       const key = (r >> 3) << 10 | (g >> 3) << 5 | (b >> 3);
-      let best;
-      if (cache.has(key)) {
-        best = cache.get(key);
-      } else {
+      let best = cache[key];
+      if (best === -1) {
         let bestDist = Infinity;
         best = 0;
         for (let j = 0; j < 256; j++) {
@@ -148,7 +167,7 @@ function quantizeFrame(data, w, h, palette) {
           const d = dr * dr + dg * dg + db * db;
           if (d < bestDist) { bestDist = d; best = j; }
         }
-        cache.set(key, best);
+        cache[key] = best;
       }
       indexed[i] = best;
 
@@ -191,7 +210,7 @@ function lzwEncode(indexed, minCodeSize) {
   const output = [];
   let codeSize = minCodeSize + 1;
   let nextCode = eoiCode + 1;
-  let table = new Map();
+  const table = new Map();
   let bitBuf = 0;
   let bitCount = 0;
 
@@ -206,23 +225,23 @@ function lzwEncode(indexed, minCodeSize) {
   }
 
   function resetTable() {
-    table = new Map();
+    table.clear();
     codeSize = minCodeSize + 1;
     nextCode = eoiCode + 1;
-    for (let i = 0; i < clearCode; i++) table.set(String(i), i);
   }
 
   emit(clearCode);
   resetTable();
 
-  let prefix = String(indexed[0]);
+  let prefix = indexed[0];
   for (let i = 1; i < indexed.length; i++) {
-    const ch = String(indexed[i]);
-    const key = prefix + ',' + ch;
-    if (table.has(key)) {
-      prefix = key;
+    const ch = indexed[i];
+    const key = prefix * 256 + ch;
+    const code = table.get(key);
+    if (code !== undefined) {
+      prefix = code;
     } else {
-      emit(table.get(prefix));
+      emit(prefix);
       if (nextCode < 4096) {
         table.set(key, nextCode++);
         if (nextCode > (1 << codeSize) && codeSize < 12) codeSize++;
@@ -234,7 +253,7 @@ function lzwEncode(indexed, minCodeSize) {
     }
   }
 
-  emit(table.get(prefix));
+  emit(prefix);
   emit(eoiCode);
 
   if (bitCount > 0) output.push(bitBuf & 0xff);
