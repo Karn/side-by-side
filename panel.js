@@ -39,10 +39,13 @@ class VideoPanel {
     this._dragStartOut = 0;
     this._hoverTime = null;
     this._preHoverTime = null;
+    this._cancelPendingLoad = null;
 
     // File input
     this.fileInput.addEventListener('change', (e) => {
-      if (e.target.files[0]) this.loadFile(e.target.files[0]);
+      if (e.target.files[0]) this.loadFile(e.target.files[0]).catch(error => {
+        if (error.name !== 'AbortError') this.onError?.(error);
+      });
     });
 
     // Drag-and-drop
@@ -53,7 +56,9 @@ class VideoPanel {
       e.preventDefault();
       dz.classList.remove('dragover');
       const f = e.dataTransfer.files[0];
-      if (f && f.type.startsWith('video/')) this.loadFile(f);
+      if (f && f.type.startsWith('video/')) this.loadFile(f).catch(error => {
+        if (error.name !== 'AbortError') this.onError?.(error);
+      });
     });
 
     // Lane mouse interaction
@@ -65,19 +70,29 @@ class VideoPanel {
 
     // Redraw on seek
     this.video.addEventListener('seeked', () => this._drawFrame());
+    this.video.addEventListener('loadeddata', () => this._drawFrame());
   }
 
   loadFile(file) {
+    this.unload();
     this.file = file;
     this.titlebarTitle.textContent = file.name;
-    this.inPoint = null;
-    this.outPoint = null;
-    this._updateTrimBadge();
-    if (this.video.src) URL.revokeObjectURL(this.video.src);
     this.video.src = URL.createObjectURL(file);
-    this.video.load();
-    return new Promise((resolve) => {
-      this.video.addEventListener('loadedmetadata', () => {
+    return new Promise((resolve, reject) => {
+      const cancel = () => {
+        this.video.removeEventListener('loadedmetadata', onMetadata);
+        this.video.removeEventListener('error', onError);
+        reject(new DOMException('Video load cancelled.', 'AbortError'));
+      };
+      const onError = () => {
+        this._cancelPendingLoad = null;
+        this.video.removeEventListener('loadedmetadata', onMetadata);
+        this.unload();
+        reject(new Error(`Could not load ${file.name}.`));
+      };
+      const onMetadata = () => {
+        this._cancelPendingLoad = null;
+        this.video.removeEventListener('error', onError);
         this.loaded = true;
         this.frame.classList.add('loaded');
         this.dropZone.classList.add('hidden');
@@ -92,8 +107,43 @@ class VideoPanel {
 
         if (this.onLoad) this.onLoad();
         resolve();
-      }, { once: true });
+      };
+      this.video.addEventListener('loadedmetadata', onMetadata, { once: true });
+      this.video.addEventListener('error', onError, { once: true });
+      this._cancelPendingLoad = cancel;
+      this.video.load();
     });
+  }
+
+  unload() {
+    if (this._cancelPendingLoad) {
+      this._cancelPendingLoad();
+      this._cancelPendingLoad = null;
+    }
+    if (this._rafId != null) cancelAnimationFrame(this._rafId);
+    this._rafId = null;
+    this.video.pause();
+    if (this.video.src) URL.revokeObjectURL(this.video.src);
+    this.video.removeAttribute('src');
+    this.video.load();
+    this.fileInput.value = '';
+    this.file = null;
+    this.loaded = false;
+    this.inPoint = null;
+    this.outPoint = null;
+    this._dragging = null;
+    this._hoverTime = null;
+    this._preHoverTime = null;
+    this.titlebarTitle.textContent = '';
+    this.frame.classList.remove('loaded');
+    this.dropZone.classList.remove('hidden');
+    this.panelContent.classList.remove('loaded');
+    this.timelineBar.classList.add('empty');
+    this.timelineBar.classList.remove('dragging');
+    this.handleIn.classList.remove('dragging');
+    this.handleOut.classList.remove('dragging');
+    this.canvas.width = 300;
+    this.canvas.height = 150;
   }
 
   clearTrim() {
@@ -123,7 +173,7 @@ class VideoPanel {
   // ── Frame rendering ──
 
   _drawFrame() {
-    if (!this.loaded || this.renderSuspended) return;
+    if (!this.loaded || this.renderSuspended || this.video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
     // Enforce playback range
     if (!this.video.paused) {
       const end = this.outPoint ?? this.video.duration;

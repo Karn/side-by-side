@@ -152,7 +152,7 @@ reducedMotion.addEventListener('change', () => {
 document.querySelectorAll('.topbar, .bottombar').forEach(rail => {
   rail.addEventListener('click', event => {
     const button = event.target.closest('button');
-    if (!button || button.disabled || reducedMotion.matches) return;
+    if (!button || button.disabled || button.closest('.app-logo') || reducedMotion.matches) return;
 
     if (!dotCanvas) {
       dotCanvas = document.createElement('canvas');
@@ -347,6 +347,7 @@ const layoutBgInput = document.getElementById('layout-bg-input');
 const panelDivider = document.getElementById('panel-divider');
 const layoutFrameSelect = document.getElementById('layout-frame-select');
 const btnBg = document.getElementById('btn-bg');
+let layoutBgFile = null;
 
 // Background button toggles the current image: clear it when set, or open the picker.
 btnBg.addEventListener('click', () => {
@@ -376,16 +377,19 @@ function applyFrameType() {
 layoutBgInput.addEventListener('change', (e) => {
   const file = e.target.files[0];
   if (!file) return;
-  if (layoutState.bgImage) URL.revokeObjectURL(layoutState.bgImage);
-  layoutState.bgImage = URL.createObjectURL(file);
-  applyLayoutBg();
+  setLayoutBg(file);
 });
 
-function clearLayoutBg() {
+function setLayoutBg(file) {
   if (layoutState.bgImage) URL.revokeObjectURL(layoutState.bgImage);
-  layoutState.bgImage = null;
+  layoutBgFile = file;
+  layoutState.bgImage = file ? URL.createObjectURL(file) : null;
   layoutBgInput.value = '';
   applyLayoutBg();
+}
+
+function clearLayoutBg() {
+  setLayoutBg(null);
 }
 
 function applyLayoutBg() {
@@ -598,6 +602,334 @@ function applyLabelSettings() {
 }
 
 applyLabelSettings();
+
+// ── Saved canvases ──
+
+const appLogo = document.querySelector('.app-logo');
+const appMenuTrigger = document.getElementById('app-menu-trigger');
+const appMenu = document.getElementById('app-menu');
+const btnNew = document.getElementById('btn-new');
+const btnSave = document.getElementById('btn-save');
+const btnSaveLabel = btnSave.querySelector('.button-label');
+const platform = navigator.userAgentData?.platform || navigator.platform;
+const metaSymbol = /Win/i.test(platform) ? '⊞' : /Mac/i.test(platform) ? '⌘' : 'Meta+';
+btnSave.title = `Save canvas (${metaSymbol}S)`;
+btnSave.querySelector('kbd').textContent = `${metaSymbol}S`;
+btnExport.title = `Export trimmed clip (${metaSymbol}E)`;
+btnExport.querySelector('kbd').textContent = `${metaSymbol}E`;
+const recentList = document.getElementById('recent-list');
+const appDialogOverlay = document.getElementById('app-dialog-overlay');
+const appDialogTitle = document.getElementById('app-dialog-title');
+const appDialogMessage = document.getElementById('app-dialog-message');
+const appDialogCancel = document.getElementById('app-dialog-cancel');
+const appDialogConfirm = document.getElementById('app-dialog-confirm');
+let dialogQueue = Promise.resolve();
+
+function showAppDialog({ title, message, confirmText = 'OK', cancelText = null }) {
+  const shown = dialogQueue.then(() => new Promise(resolve => {
+    const previousFocus = appMenu.contains(document.activeElement)
+      ? appMenuTrigger
+      : document.activeElement;
+    closeAppMenu();
+    appDialogTitle.textContent = title;
+    appDialogMessage.textContent = message;
+    appDialogConfirm.textContent = confirmText;
+    appDialogCancel.hidden = !cancelText;
+    if (cancelText) appDialogCancel.textContent = cancelText;
+    appDialogOverlay.classList.remove('hidden');
+
+    let closed = false;
+    const finish = accepted => {
+      if (closed) return;
+      closed = true;
+      appDialogOverlay.classList.add('hidden');
+      appDialogOverlay.onclick = null;
+      appDialogOverlay.onkeydown = null;
+      appDialogConfirm.onclick = null;
+      appDialogCancel.onclick = null;
+      if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus();
+      resolve(accepted);
+    };
+    appDialogConfirm.onclick = () => finish(true);
+    appDialogCancel.onclick = () => finish(false);
+    appDialogOverlay.onclick = event => {
+      if (event.target === appDialogOverlay) finish(!cancelText);
+    };
+    appDialogOverlay.onkeydown = event => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        finish(!cancelText);
+      } else if (event.key === 'Tab') {
+        event.preventDefault();
+        const buttons = cancelText ? [appDialogCancel, appDialogConfirm] : [appDialogConfirm];
+        const index = buttons.indexOf(document.activeElement);
+        buttons[(index + (event.shiftKey ? buttons.length - 1 : 1)) % buttons.length].focus();
+      }
+    };
+    (cancelText ? appDialogCancel : appDialogConfirm).focus();
+  }));
+  dialogQueue = shown.then(() => undefined);
+  return shown;
+}
+
+leftPanel.onError = error => void showAppDialog({ title: 'Unable to load video', message: error.message });
+rightPanel.onError = error => void showAppDialog({ title: 'Unable to load video', message: error.message });
+
+function closeAppMenu(restoreFocus = false) {
+  appMenu.hidden = true;
+  appMenuTrigger.setAttribute('aria-expanded', 'false');
+  if (restoreFocus) appMenuTrigger.focus();
+}
+
+function openAppMenu(focusItem = false) {
+  appMenu.hidden = false;
+  appMenuTrigger.setAttribute('aria-expanded', 'true');
+  if (focusItem) appMenu.querySelector('button:not(:disabled)')?.focus();
+  renderRecent().catch(storageError);
+}
+
+appMenuTrigger.addEventListener('click', () => {
+  if (appMenu.hidden) openAppMenu();
+  else closeAppMenu();
+});
+appMenuTrigger.addEventListener('keydown', event => {
+  if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+  event.preventDefault();
+  openAppMenu();
+  const items = [...appMenu.querySelectorAll('button:not(:disabled)')];
+  (event.key === 'ArrowDown' ? items[0] : items.at(-1))?.focus();
+});
+appMenu.addEventListener('keydown', event => {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeAppMenu(true);
+  } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    const items = [...appMenu.querySelectorAll('button:not(:disabled)')];
+    const direction = event.key === 'ArrowDown' ? 1 : -1;
+    const index = items.indexOf(document.activeElement);
+    items[(index + direction + items.length) % items.length]?.focus();
+  }
+});
+document.addEventListener('pointerdown', event => {
+  if (!appLogo.contains(event.target)) closeAppMenu();
+});
+appLogo.addEventListener('focusout', () => {
+  requestAnimationFrame(() => {
+    if (!appLogo.contains(document.activeElement)) closeAppMenu();
+  });
+});
+
+function capturePanel(panel) {
+  return {
+    file: panel.loaded ? panel.file : null,
+    inPoint: panel.inPoint,
+    outPoint: panel.outPoint,
+    currentTime: panel.loaded ? panel.currentTime : 0,
+    title: panel.panel.querySelector('.label-title-input').value,
+    subtitle: panel.panel.querySelector('.label-subtitle-input').value,
+  };
+}
+
+function captureCanvas() {
+  const { bgImage, ...layout } = layoutState;
+  return {
+    version: 1,
+    layout,
+    backgroundFile: layoutBgFile,
+    left: capturePanel(leftPanel),
+    right: capturePanel(rightPanel),
+    speed: speedSel.value,
+    exportFormat: document.getElementById('export-format').value,
+    exportFps: document.getElementById('export-fps').value,
+  };
+}
+
+const emptyCanvas = captureCanvas();
+
+async function restorePanel(panel, state) {
+  panel.unload();
+  panel.panel.querySelector('.label-title-input').value = state.title;
+  panel.panel.querySelector('.label-subtitle-input').value = state.subtitle;
+  if (!state.file) return;
+
+  await panel.loadFile(state.file);
+  panel.inPoint = state.inPoint;
+  panel.outPoint = state.outPoint;
+  panel._updateRangeVisual();
+  const target = Math.max(0, Math.min(state.currentTime, panel.duration));
+  if (panel.currentTime !== target) {
+    await new Promise(resolve => {
+      panel.video.addEventListener('seeked', resolve, { once: true });
+      panel.currentTime = target;
+    });
+  }
+  if (panel.video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+    await new Promise(resolve => panel.video.addEventListener('loadeddata', resolve, { once: true }));
+  }
+  panel._drawFrame();
+}
+
+async function restoreCanvas(state) {
+  if (state?.version !== 1) throw new Error('This saved canvas uses an unsupported format.');
+  stopPlay();
+  Object.assign(layoutState, state.layout);
+  setLayoutBg(state.backgroundFile);
+  layoutFrameSelect.value = layoutState.frame;
+  labelSizeSelect.value = layoutState.labelSize;
+  labelPositionSelect.value = layoutState.labelPosition;
+  speedSel.value = state.speed;
+  document.getElementById('export-format').value = state.exportFormat;
+  document.getElementById('export-fps').value = state.exportFps;
+  [layoutFrameSelect, labelSizeSelect, labelPositionSelect, speedSel,
+    document.getElementById('export-format'), document.getElementById('export-fps')]
+    .forEach(select => select.dispatchEvent(new Event('change')));
+  btnTitle.classList.toggle('on', layoutState.titleVisible);
+  btnTitle.setAttribute('aria-pressed', layoutState.titleVisible);
+  btnSubtitle.classList.toggle('on', layoutState.subtitleVisible);
+  btnSubtitle.setAttribute('aria-pressed', layoutState.subtitleVisible);
+  applyLabelSettings();
+  applyLayoutGap();
+  applyCanvasPadding();
+  await Promise.all([
+    restorePanel(leftPanel, state.left),
+    restorePanel(rightPanel, state.right),
+  ]);
+  applySpeed();
+}
+
+function storageError(error) {
+  console.error(error);
+  void showAppDialog({
+    title: 'Saved canvases',
+    message: error?.name === 'QuotaExceededError'
+      ? 'Browser storage is full. Delete a saved canvas or free space, then try again.'
+      : error?.message || 'Could not access saved canvases.',
+  });
+}
+
+btnNew.addEventListener('click', async () => {
+  if (leftPanel.loaded || rightPanel.loaded || layoutBgFile) {
+    const accepted = await showAppDialog({
+      title: 'New canvas',
+      message: 'Create a new canvas and discard changes to the current one?',
+      confirmText: 'Create',
+      cancelText: 'Cancel',
+    });
+    if (!accepted) {
+      openAppMenu(true);
+      return;
+    }
+  }
+  try {
+    await restoreCanvas(emptyCanvas);
+    closeAppMenu(true);
+  } catch (error) {
+    storageError(error);
+  }
+});
+
+btnSave.addEventListener('click', async () => {
+  if (!leftPanel.loaded && !rightPanel.loaded) {
+    await showAppDialog({ title: 'Nothing to save', message: 'Add a video before saving a canvas.' });
+    return;
+  }
+  btnSave.disabled = true;
+  try {
+    const leftName = leftPanel.panel.querySelector('.label-title-input').value || leftPanel.file?.name;
+    const rightName = rightPanel.panel.querySelector('.label-title-input').value || rightPanel.file?.name;
+    const savedAt = Date.now();
+    await CanvasStorage.save({
+      id: crypto.randomUUID(),
+      name: [leftName, rightName].filter(Boolean).join(' / ') || 'Canvas',
+      savedAt,
+      state: captureCanvas(),
+    });
+    btnSaveLabel.textContent = 'Saved';
+    await renderRecent();
+    setTimeout(() => {
+      btnSaveLabel.textContent = 'Save';
+    }, 1200);
+  } catch (error) {
+    storageError(error);
+  } finally {
+    btnSave.disabled = false;
+  }
+});
+
+async function renderRecent() {
+  recentList.textContent = 'Loading…';
+  const canvases = await CanvasStorage.list();
+  recentList.replaceChildren();
+  if (!canvases.length) {
+    recentList.textContent = 'No recent saves yet.';
+    return;
+  }
+  for (const canvas of canvases) {
+    const row = document.createElement('div');
+    row.className = 'recent-row';
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.setAttribute('role', 'menuitem');
+    open.className = 'recent-open';
+    const savedDate = new Date(canvas.savedAt).toLocaleString();
+    open.textContent = savedDate;
+    open.setAttribute('aria-label', `Open ${canvas.name}, saved ${savedDate}`);
+    open.addEventListener('click', async () => {
+      if (leftPanel.loaded || rightPanel.loaded) {
+        const accepted = await showAppDialog({
+          title: 'Open saved canvas',
+          message: `“${canvas.name}”\nSaved ${savedDate}\n\nOpen this canvas and replace the current one?`,
+          confirmText: 'Open',
+          cancelText: 'Cancel',
+        });
+        if (!accepted) {
+          openAppMenu(true);
+          return;
+        }
+      }
+      open.disabled = true;
+      try {
+        const saved = await CanvasStorage.get(canvas.id);
+        if (!saved) throw new Error('Saved canvas was not found.');
+        await restoreCanvas(saved.state);
+        closeAppMenu(true);
+      } catch (error) {
+        storageError(error);
+        open.disabled = false;
+      }
+    });
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.setAttribute('role', 'menuitem');
+    remove.textContent = 'Delete';
+    remove.setAttribute('aria-label', `Delete ${canvas.name}, saved ${savedDate}`);
+    remove.addEventListener('click', async () => {
+      const accepted = await showAppDialog({
+        title: 'Delete saved canvas',
+        message: `“${canvas.name}”\nSaved ${savedDate}\n\nDelete this saved canvas?`,
+        confirmText: 'Delete',
+        cancelText: 'Cancel',
+      });
+      if (!accepted) {
+        openAppMenu(true);
+        return;
+      }
+      try {
+        await CanvasStorage.delete(canvas.id);
+        openAppMenu(true);
+      } catch (error) {
+        storageError(error);
+      }
+    });
+    row.append(open, remove);
+    recentList.append(row);
+  }
+}
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./service-worker.js').catch(console.error));
+}
 
 // ── Export ──
 
@@ -911,9 +1243,20 @@ function roundRect(ctx, x, y, w, h, r) {
 // ── Keyboard ──
 
 document.addEventListener('keydown', (e) => {
+  if (e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey &&
+      (e.code === 'KeyS' || e.code === 'KeyE')) {
+    e.preventDefault();
+    if (e.repeat || !appDialogOverlay.classList.contains('hidden') ||
+        !document.getElementById('export-overlay').classList.contains('hidden')) return;
+    if (e.code === 'KeyS') btnSave.click();
+    else void exportCanvas();
+    return;
+  }
   const target = e.target instanceof Element ? e.target : null;
   if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
   if (document.querySelector('.dropdown-menu:not([hidden])')) return;
+  if (!appMenu.hidden) return;
+  if (!appDialogOverlay.classList.contains('hidden')) return;
   if (!document.getElementById('export-overlay').classList.contains('hidden')) return;
   if (e.repeat) return;
 
@@ -922,11 +1265,6 @@ document.addEventListener('keydown', (e) => {
       if (target?.closest('button, [role="option"]')) return;
       e.preventDefault();
       togglePlay();
-      break;
-    case 'KeyE':
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-      e.preventDefault();
-      void exportCanvas();
       break;
   }
 });

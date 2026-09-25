@@ -18,8 +18,19 @@
 
 <header class="topbar">
   <div class="app-logo">
-    <span class="logo-icon">□■</span>
-    <span class="logo-text">SIDE-BY-SIDE</span>
+    <button id="app-menu-trigger" class="app-logo-trigger" type="button" aria-label="Side-by-Side menu" aria-haspopup="menu" aria-expanded="false" aria-controls="app-menu">
+      <span class="logo-icon">□■</span>
+      <span class="logo-text">SIDE-BY-SIDE</span>
+    </button>
+    <div id="app-menu" class="app-menu" role="menu" aria-label="Canvas actions" hidden>
+      <div class="app-menu-actions" role="group" aria-label="Canvas actions">
+        <button id="btn-new" type="button" role="menuitem" aria-label="New canvas" title="New canvas">New</button>
+        <span class="app-menu-spacer" aria-hidden="true"></span>
+        <button id="btn-save" class="filled" type="button" role="menuitem" title="Save canvas (⌘S)" aria-keyshortcuts="Meta+S"><span class="button-label">Save</span><kbd>⌘S</kbd></button>
+      </div>
+      <div class="app-menu-heading" role="presentation">Recent saves</div>
+      <div class="recent-list" id="recent-list" role="group" aria-label="Recent saves"></div>
+    </div>
   </div>
   <div class="toolbar" role="toolbar" aria-label="Canvas controls">
     <div class="toolbar-group">
@@ -152,10 +163,24 @@
       <option value="2">2x Speed</option>
     </select>
     <span class="rail-divider" aria-hidden="true"></span>
-    <button id="btn-export" class="filled" title="Export trimmed clip from active panel [E]">Export <kbd>E</kbd></button>
+    <button id="btn-export" class="filled" title="Export trimmed clip (⌘E)" aria-keyshortcuts="Meta+E">Export <kbd>⌘E</kbd></button>
   </div>
 </footer>
 
+<div class="export-overlay hidden" id="app-dialog-overlay">
+  <div class="export-dialog app-dialog" role="dialog" aria-modal="true" aria-labelledby="app-dialog-title" aria-describedby="app-dialog-message">
+    <div class="export-header">
+      <span class="export-title" id="app-dialog-title"></span>
+    </div>
+    <div class="export-body">
+      <p class="app-dialog-message" id="app-dialog-message"></p>
+      <div class="export-controls-row app-dialog-actions">
+        <button id="app-dialog-cancel" type="button">Cancel</button>
+        <button id="app-dialog-confirm" class="filled" type="button">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="export-overlay hidden" id="export-overlay">
   <div class="export-dialog">
@@ -190,6 +215,7 @@
 
 <script src="exporters/exporter-registry.js"></script>
 <script src="panel.js"></script>
+<script src="canvas-storage.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

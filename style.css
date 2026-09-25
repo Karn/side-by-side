@@ -94,9 +94,64 @@ body {
 .app-logo {
   position: absolute;
   left: 12px;
+}
+
+button.app-logo-trigger {
+  all: unset;
   display: flex;
   align-items: center;
   gap: 8px;
+  cursor: pointer;
+}
+
+.app-logo-trigger:hover:not(:disabled),
+.app-logo-trigger:active:not(:disabled) {
+  background: transparent;
+  color: inherit;
+}
+
+.app-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  display: grid;
+  gap: 2px;
+  width: min(320px, calc(100vw - 24px));
+  padding: 8px;
+  border: 1px solid var(--color-ui-border);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14), 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.app-menu[hidden] { display: none; }
+
+.app-menu button {
+  width: 100%;
+}
+
+.app-menu button:not(.filled) {
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.app-menu-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 2px 8px;
+}
+
+.app-menu-actions button { width: auto; }
+.app-menu-spacer { flex: 1; }
+
+.app-menu-heading {
+  padding: 10px 6px 4px;
+  border-top: 1px solid var(--color-ui-border);
+  color: var(--color-label-subtitle);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .toolbar {
@@ -152,13 +207,15 @@ body {
   gap: var(--rail-control-gap);
 }
 
-.bottom-controls button {
+.bottom-controls button,
+.app-menu-actions button.filled {
   display: flex;
   align-items: center;
-  gap: var(--rail-control-gap);
+  gap: var(--rail-control-gap, 6px);
 }
 
-.bottom-controls kbd {
+.bottom-controls kbd,
+.app-menu-actions kbd {
   color: inherit;
   font: inherit;
   letter-spacing: 0;
@@ -857,6 +914,32 @@ button.on { background: var(--color-btn-on-bg); border-color: var(--color-btn-on
 
 .range-handle.dragging .range-tooltip { opacity: 1; }
 
+.recent-list {
+  overflow: auto;
+  max-height: 260px;
+  padding: 4px;
+  font-size: 12px;
+}
+
+.recent-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px;
+}
+
+.app-menu .recent-open {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.recent-row button:last-child { width: auto; }
+
 /* ── Export overlay ── */
 .export-overlay {
   position: fixed;
@@ -942,6 +1025,23 @@ button.on { background: var(--color-btn-on-bg); border-color: var(--color-btn-on
   margin-left: auto;
 }
 
+.app-dialog {
+  width: min(380px, calc(100vw - 32px));
+  min-width: 0;
+}
+
+#app-dialog-overlay { z-index: 110; }
+
+.app-dialog-message {
+  color: var(--color-text);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.app-dialog-actions { justify-content: flex-end; }
+
 /* ── Utilities ── */
 .visually-hidden-input {
   position: absolute;
@@ -956,5 +1056,5 @@ button.on { background: var(--color-btn-on-bg); border-color: var(--color-btn-on
 }
 
 @media (max-width: 960px) {
-  .app-logo { display: none; }
+  .app-logo .logo-text { display: none; }
 }
