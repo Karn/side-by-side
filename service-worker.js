@@ -1,4 +1,4 @@
-const CACHE_NAME = 'side-by-side-shell-v4';
+const CACHE_NAME = 'side-by-side-shell-v6';
 const ASSETS = [
   'index.html',
   'style.css',

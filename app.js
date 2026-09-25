@@ -46,8 +46,12 @@ function applyCanvasPadding() {
   resizeCanvas();
 }
 
-leftPanel.onLoad = applyCanvasPadding;
-rightPanel.onLoad = applyCanvasPadding;
+leftPanel.onLoad = () => { applyCanvasPadding(); recordCanvasChange(); };
+rightPanel.onLoad = () => { applyCanvasPadding(); recordCanvasChange(); };
+leftPanel.onScrubStart = beginCanvasAction;
+rightPanel.onScrubStart = beginCanvasAction;
+leftPanel.onScrubEnd = recordCanvasChange;
+rightPanel.onScrubEnd = recordCanvasChange;
 
 // ── Canvas sizing (16:9 export surface) ──
 
@@ -152,7 +156,7 @@ reducedMotion.addEventListener('change', () => {
 document.querySelectorAll('.topbar, .bottombar').forEach(rail => {
   rail.addEventListener('click', event => {
     const button = event.target.closest('button');
-    if (!button || button.disabled || button.closest('.app-logo') || reducedMotion.matches) return;
+    if (!button || button.disabled || reducedMotion.matches) return;
 
     if (!dotCanvas) {
       dotCanvas = document.createElement('canvas');
@@ -422,6 +426,7 @@ let vpadStartVal = 0;
 
 vpadTop.addEventListener('mousedown', (e) => {
   e.preventDefault();
+  beginCanvasAction();
   vpadDragging = 'top';
   vpadStartY = e.clientY;
   vpadStartVal = layoutState.canvasPaddingTop;
@@ -429,6 +434,7 @@ vpadTop.addEventListener('mousedown', (e) => {
 
 vpadBottom.addEventListener('mousedown', (e) => {
   e.preventDefault();
+  beginCanvasAction();
   vpadDragging = 'bottom';
   vpadStartY = e.clientY;
   vpadStartVal = layoutState.canvasPaddingBottom;
@@ -452,6 +458,7 @@ document.addEventListener('mousemove', (e) => {
 document.addEventListener('mouseup', () => {
   if (!vpadDragging) return;
   vpadDragging = null;
+  recordCanvasChange();
 });
 
 // ── Draggable horizontal padding handles ──
@@ -464,6 +471,7 @@ let hpadStartVal = 0;
 
 hpadLeft.addEventListener('mousedown', (e) => {
   e.preventDefault();
+  beginCanvasAction();
   hpadDragging = 'left';
   hpadStartX = e.clientX;
   hpadStartVal = layoutState.canvasPaddingLeft;
@@ -471,6 +479,7 @@ hpadLeft.addEventListener('mousedown', (e) => {
 
 hpadRight.addEventListener('mousedown', (e) => {
   e.preventDefault();
+  beginCanvasAction();
   hpadDragging = 'right';
   hpadStartX = e.clientX;
   hpadStartVal = layoutState.canvasPaddingRight;
@@ -494,6 +503,7 @@ document.addEventListener('mousemove', (e) => {
 document.addEventListener('mouseup', () => {
   if (!hpadDragging) return;
   hpadDragging = null;
+  recordCanvasChange();
 });
 
 // ── Draggable divider (gap column) ──
@@ -505,6 +515,7 @@ let dividerStartGap = 0;
 
 dividerHandle.addEventListener('mousedown', (e) => {
   e.preventDefault();
+  beginCanvasAction();
   dividerDragging = true;
   dividerStartX = e.clientX;
   dividerStartGap = layoutState.gap;
@@ -525,6 +536,7 @@ document.addEventListener('mouseup', () => {
   if (!dividerDragging) return;
   dividerDragging = false;
   panelDivider.classList.remove('dragging');
+  recordCanvasChange();
 });
 
 function applyLayoutGap() {
@@ -533,7 +545,10 @@ function applyLayoutGap() {
 
 // ── Playback ──
 
-function togglePlay() { playing ? stopPlay() : startPlay(); }
+function togglePlay() {
+  playing ? stopPlay() : startPlay();
+  recordCanvasChange();
+}
 
 function startPlay() {
   if (!leftPanel.loaded && !rightPanel.loaded) return;
@@ -603,21 +618,16 @@ function applyLabelSettings() {
 
 applyLabelSettings();
 
-// ── Saved canvases ──
+// ── Canvas history ──
 
-const appLogo = document.querySelector('.app-logo');
-const appMenuTrigger = document.getElementById('app-menu-trigger');
-const appMenu = document.getElementById('app-menu');
-const btnNew = document.getElementById('btn-new');
-const btnSave = document.getElementById('btn-save');
-const btnSaveLabel = btnSave.querySelector('.button-label');
+const btnUndo = document.getElementById('btn-undo');
+const btnRedo = document.getElementById('btn-redo');
 const platform = navigator.userAgentData?.platform || navigator.platform;
 const metaSymbol = /Win/i.test(platform) ? '⊞' : /Mac/i.test(platform) ? '⌘' : 'Meta+';
-btnSave.title = `Save canvas (${metaSymbol}S)`;
-btnSave.querySelector('kbd').textContent = `${metaSymbol}S`;
+btnUndo.title = `Undo (${metaSymbol}Z)`;
+btnRedo.title = `Redo (${metaSymbol}Shift+Z)`;
 btnExport.title = `Export trimmed clip (${metaSymbol}E)`;
 btnExport.querySelector('kbd').textContent = `${metaSymbol}E`;
-const recentList = document.getElementById('recent-list');
 const appDialogOverlay = document.getElementById('app-dialog-overlay');
 const appDialogTitle = document.getElementById('app-dialog-title');
 const appDialogMessage = document.getElementById('app-dialog-message');
@@ -627,10 +637,7 @@ let dialogQueue = Promise.resolve();
 
 function showAppDialog({ title, message, confirmText = 'OK', cancelText = null }) {
   const shown = dialogQueue.then(() => new Promise(resolve => {
-    const previousFocus = appMenu.contains(document.activeElement)
-      ? appMenuTrigger
-      : document.activeElement;
-    closeAppMenu();
+    const previousFocus = document.activeElement;
     appDialogTitle.textContent = title;
     appDialogMessage.textContent = message;
     appDialogConfirm.textContent = confirmText;
@@ -675,57 +682,12 @@ function showAppDialog({ title, message, confirmText = 'OK', cancelText = null }
 leftPanel.onError = error => void showAppDialog({ title: 'Unable to load video', message: error.message });
 rightPanel.onError = error => void showAppDialog({ title: 'Unable to load video', message: error.message });
 
-function closeAppMenu(restoreFocus = false) {
-  appMenu.hidden = true;
-  appMenuTrigger.setAttribute('aria-expanded', 'false');
-  if (restoreFocus) appMenuTrigger.focus();
-}
-
-function openAppMenu(focusItem = false) {
-  appMenu.hidden = false;
-  appMenuTrigger.setAttribute('aria-expanded', 'true');
-  if (focusItem) appMenu.querySelector('button:not(:disabled)')?.focus();
-  renderRecent().catch(storageError);
-}
-
-appMenuTrigger.addEventListener('click', () => {
-  if (appMenu.hidden) openAppMenu();
-  else closeAppMenu();
-});
-appMenuTrigger.addEventListener('keydown', event => {
-  if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
-  event.preventDefault();
-  openAppMenu();
-  const items = [...appMenu.querySelectorAll('button:not(:disabled)')];
-  (event.key === 'ArrowDown' ? items[0] : items.at(-1))?.focus();
-});
-appMenu.addEventListener('keydown', event => {
-  if (event.key === 'Escape') {
-    event.preventDefault();
-    closeAppMenu(true);
-  } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-    event.preventDefault();
-    const items = [...appMenu.querySelectorAll('button:not(:disabled)')];
-    const direction = event.key === 'ArrowDown' ? 1 : -1;
-    const index = items.indexOf(document.activeElement);
-    items[(index + direction + items.length) % items.length]?.focus();
-  }
-});
-document.addEventListener('pointerdown', event => {
-  if (!appLogo.contains(event.target)) closeAppMenu();
-});
-appLogo.addEventListener('focusout', () => {
-  requestAnimationFrame(() => {
-    if (!appLogo.contains(document.activeElement)) closeAppMenu();
-  });
-});
-
 function capturePanel(panel) {
   return {
     file: panel.loaded ? panel.file : null,
     inPoint: panel.inPoint,
     outPoint: panel.outPoint,
-    currentTime: panel.loaded ? panel.currentTime : 0,
+    currentTime: panel.loaded ? (panel._preHoverTime ?? panel.currentTime) : 0,
     title: panel.panel.querySelector('.label-title-input').value,
     subtitle: panel.panel.querySelector('.label-subtitle-input').value,
   };
@@ -745,27 +707,48 @@ function captureCanvas() {
   };
 }
 
-const emptyCanvas = captureCanvas();
+function waitForVideoEvent(video, name) {
+  return new Promise((resolve, reject) => {
+    if (video.error) {
+      reject(new Error('Could not restore the saved video.'));
+      return;
+    }
+    const finish = error => {
+      clearTimeout(timeout);
+      video.removeEventListener(name, onReady);
+      video.removeEventListener('error', onError);
+      if (error) reject(error);
+      else resolve();
+    };
+    const onReady = () => finish();
+    const onError = () => finish(new Error('Could not restore the saved video.'));
+    const timeout = setTimeout(() => finish(new Error('Timed out restoring the saved video.')), 30000);
+    video.addEventListener(name, onReady, { once: true });
+    video.addEventListener('error', onError, { once: true });
+  });
+}
 
 async function restorePanel(panel, state) {
-  panel.unload();
+  panel._onLaneLeave();
+  if (panel.file !== state.file || (state.file && !panel.loaded)) {
+    panel.unload();
+    if (state.file) await panel.loadFile(state.file);
+  }
   panel.panel.querySelector('.label-title-input').value = state.title;
   panel.panel.querySelector('.label-subtitle-input').value = state.subtitle;
   if (!state.file) return;
 
-  await panel.loadFile(state.file);
   panel.inPoint = state.inPoint;
   panel.outPoint = state.outPoint;
   panel._updateRangeVisual();
   const target = Math.max(0, Math.min(state.currentTime, panel.duration));
-  if (panel.currentTime !== target) {
-    await new Promise(resolve => {
-      panel.video.addEventListener('seeked', resolve, { once: true });
-      panel.currentTime = target;
-    });
+  if (Math.abs(panel.currentTime - target) > 0.001) {
+    const seeked = waitForVideoEvent(panel.video, 'seeked');
+    panel.currentTime = target;
+    await seeked;
   }
   if (panel.video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
-    await new Promise(resolve => panel.video.addEventListener('loadeddata', resolve, { once: true }));
+    await waitForVideoEvent(panel.video, 'loadeddata');
   }
   panel._drawFrame();
 }
@@ -798,135 +781,228 @@ async function restoreCanvas(state) {
   applySpeed();
 }
 
-function storageError(error) {
+let canvasErrorKey = null;
+function canvasError(error) {
   console.error(error);
-  void showAppDialog({
-    title: 'Saved canvases',
-    message: error?.name === 'QuotaExceededError'
-      ? 'Browser storage is full. Delete a saved canvas or free space, then try again.'
-      : error?.message || 'Could not access saved canvases.',
+  const message = error?.name === 'QuotaExceededError'
+    ? 'Browser storage is full. Free space, then make another change to retry autosave.'
+    : error?.message || 'Could not update this canvas.';
+  if (canvasErrorKey === message) return;
+  canvasErrorKey = message;
+  void showAppDialog({ title: 'Canvas', message });
+}
+
+const fileKeys = new WeakMap();
+let nextFileKey = 0;
+
+function fileKey(file) {
+  if (!file) return null;
+  if (!fileKeys.has(file)) fileKeys.set(file, ++nextFileKey);
+  return fileKeys.get(file);
+}
+
+function snapshotKey(state) {
+  return JSON.stringify({
+    ...state,
+    backgroundFile: fileKey(state.backgroundFile),
+    left: { ...state.left, file: fileKey(state.left.file) },
+    right: { ...state.right, file: fileKey(state.right.file) },
   });
 }
 
-btnNew.addEventListener('click', async () => {
-  if (leftPanel.loaded || rightPanel.loaded || layoutBgFile) {
-    const accepted = await showAppDialog({
-      title: 'New canvas',
-      message: 'Create a new canvas and discard changes to the current one?',
-      confirmText: 'Create',
-      cancelText: 'Cancel',
-    });
-    if (!accepted) {
-      openAppMenu(true);
-      return;
+const emptyCanvas = captureCanvas();
+let history = [emptyCanvas];
+let historyKeys = [snapshotKey(emptyCanvas)];
+let historyIndex = 0;
+let historyReady = false;
+let historyBusy = false;
+let textChangeTimer = null;
+let pendingState = null;
+let persisting = false;
+
+function updateHistoryButtons() {
+  const pendingText = textChangeTimer !== null;
+  btnUndo.disabled = !historyReady || historyBusy || (historyIndex === 0 && !pendingText);
+  btnRedo.disabled = !historyReady || historyBusy || pendingText || historyIndex === history.length - 1;
+}
+
+function beginCanvasAction() {
+  if (!historyReady || historyBusy) return;
+  flushTextChange();
+  const state = captureCanvas();
+  history[historyIndex] = state;
+  historyKeys[historyIndex] = snapshotKey(state);
+}
+
+function queuePersist(state = captureCanvas()) {
+  if (!historyReady) return;
+  pendingState = state;
+  if (persisting) return;
+  persisting = true;
+  void (async () => {
+    while (pendingState) {
+      const next = pendingState;
+      pendingState = null;
+      try {
+        await CanvasStorage.saveCurrent(next);
+        canvasErrorKey = null;
+      } catch (error) {
+        canvasError(error);
+        pendingState = null;
+      }
     }
-  }
-  try {
-    await restoreCanvas(emptyCanvas);
-    closeAppMenu(true);
-  } catch (error) {
-    storageError(error);
-  }
-});
+    persisting = false;
+  })();
+}
 
-btnSave.addEventListener('click', async () => {
-  if (!leftPanel.loaded && !rightPanel.loaded) {
-    await showAppDialog({ title: 'Nothing to save', message: 'Add a video before saving a canvas.' });
-    return;
+function recordCanvasChange() {
+  if (!historyReady || historyBusy) return;
+  const state = captureCanvas();
+  const key = snapshotKey(state);
+  if (key === historyKeys[historyIndex]) return;
+
+  history.length = historyIndex + 1;
+  historyKeys.length = historyIndex + 1;
+  history.push(state);
+  historyKeys.push(key);
+  if (history.length > 100) {
+    history.shift();
+    historyKeys.shift();
   }
-  btnSave.disabled = true;
+  historyIndex = history.length - 1;
+  updateHistoryButtons();
+  queuePersist(state);
+}
+
+function flushTextChange() {
+  if (textChangeTimer === null) return;
+  clearTimeout(textChangeTimer);
+  textChangeTimer = null;
+  recordCanvasChange();
+  updateHistoryButtons();
+}
+
+async function moveHistory(direction) {
+  if (!historyReady || historyBusy) return;
+  flushTextChange();
+  const nextIndex = historyIndex + direction;
+  if (nextIndex < 0 || nextIndex >= history.length) return;
+  historyBusy = true;
+  document.body.inert = true;
+  updateHistoryButtons();
   try {
-    const leftName = leftPanel.panel.querySelector('.label-title-input').value || leftPanel.file?.name;
-    const rightName = rightPanel.panel.querySelector('.label-title-input').value || rightPanel.file?.name;
-    const savedAt = Date.now();
-    await CanvasStorage.save({
-      id: crypto.randomUUID(),
-      name: [leftName, rightName].filter(Boolean).join(' / ') || 'Canvas',
-      savedAt,
-      state: captureCanvas(),
-    });
-    btnSaveLabel.textContent = 'Saved';
-    await renderRecent();
-    setTimeout(() => {
-      btnSaveLabel.textContent = 'Save';
-    }, 1200);
+    await restoreCanvas(history[nextIndex]);
+    historyIndex = nextIndex;
+    history[historyIndex] = captureCanvas();
+    historyKeys[historyIndex] = snapshotKey(history[historyIndex]);
+    queuePersist(history[historyIndex]);
   } catch (error) {
-    storageError(error);
+    canvasError(error);
   } finally {
-    btnSave.disabled = false;
-  }
-});
-
-async function renderRecent() {
-  recentList.textContent = 'Loading…';
-  const canvases = await CanvasStorage.list();
-  recentList.replaceChildren();
-  if (!canvases.length) {
-    recentList.textContent = 'No recent saves yet.';
-    return;
-  }
-  for (const canvas of canvases) {
-    const row = document.createElement('div');
-    row.className = 'recent-row';
-    const open = document.createElement('button');
-    open.type = 'button';
-    open.setAttribute('role', 'menuitem');
-    open.className = 'recent-open';
-    const savedDate = new Date(canvas.savedAt).toLocaleString();
-    open.textContent = savedDate;
-    open.setAttribute('aria-label', `Open ${canvas.name}, saved ${savedDate}`);
-    open.addEventListener('click', async () => {
-      if (leftPanel.loaded || rightPanel.loaded) {
-        const accepted = await showAppDialog({
-          title: 'Open saved canvas',
-          message: `“${canvas.name}”\nSaved ${savedDate}\n\nOpen this canvas and replace the current one?`,
-          confirmText: 'Open',
-          cancelText: 'Cancel',
-        });
-        if (!accepted) {
-          openAppMenu(true);
-          return;
-        }
-      }
-      open.disabled = true;
-      try {
-        const saved = await CanvasStorage.get(canvas.id);
-        if (!saved) throw new Error('Saved canvas was not found.');
-        await restoreCanvas(saved.state);
-        closeAppMenu(true);
-      } catch (error) {
-        storageError(error);
-        open.disabled = false;
-      }
-    });
-    const remove = document.createElement('button');
-    remove.type = 'button';
-    remove.setAttribute('role', 'menuitem');
-    remove.textContent = 'Delete';
-    remove.setAttribute('aria-label', `Delete ${canvas.name}, saved ${savedDate}`);
-    remove.addEventListener('click', async () => {
-      const accepted = await showAppDialog({
-        title: 'Delete saved canvas',
-        message: `“${canvas.name}”\nSaved ${savedDate}\n\nDelete this saved canvas?`,
-        confirmText: 'Delete',
-        cancelText: 'Cancel',
-      });
-      if (!accepted) {
-        openAppMenu(true);
-        return;
-      }
-      try {
-        await CanvasStorage.delete(canvas.id);
-        openAppMenu(true);
-      } catch (error) {
-        storageError(error);
-      }
-    });
-    row.append(open, remove);
-    recentList.append(row);
+    historyBusy = false;
+    document.body.inert = false;
+    updateHistoryButtons();
   }
 }
 
+btnUndo.addEventListener('click', () => void moveHistory(-1));
+btnRedo.addEventListener('click', () => void moveHistory(1));
+
+document.getElementById('btn-new').addEventListener('click', async () => {
+  if (!historyReady || historyBusy) return;
+  if (snapshotKey(captureCanvas()) !== snapshotKey(emptyCanvas)) {
+    const accepted = await showAppDialog({
+      title: 'New canvas',
+      message: 'Create a new canvas? You can undo this change.',
+      confirmText: 'Create',
+      cancelText: 'Cancel',
+    });
+    if (!accepted) return;
+  }
+  historyBusy = true;
+  document.body.inert = true;
+  updateHistoryButtons();
+  try {
+    await restoreCanvas(emptyCanvas);
+  } catch (error) {
+    canvasError(error);
+  } finally {
+    historyBusy = false;
+    document.body.inert = false;
+    updateHistoryButtons();
+  }
+  recordCanvasChange();
+});
+
+document.addEventListener('focusin', event => {
+  if (event.target.matches('.label-title-input, .label-subtitle-input')) beginCanvasAction();
+});
+document.addEventListener('focusout', event => {
+  if (event.target.matches('.label-title-input, .label-subtitle-input')) flushTextChange();
+});
+document.addEventListener('input', event => {
+  if (event.target.matches('.label-title-input, .label-subtitle-input')) {
+    queuePersist();
+    if (textChangeTimer !== null) clearTimeout(textChangeTimer);
+    textChangeTimer = setTimeout(() => {
+      textChangeTimer = null;
+      recordCanvasChange();
+      updateHistoryButtons();
+    }, 700);
+    updateHistoryButtons();
+  }
+});
+document.addEventListener('change', event => {
+  if (event.target.matches(
+    '#layout-frame-select, #layout-bg-input, #label-size-select, #label-position-select, ' +
+    '#speed, #export-format, #export-fps'
+  )) recordCanvasChange();
+});
+document.addEventListener('click', event => {
+  if (event.target.closest('#btn-bg, #btn-title, #btn-subtitle')) {
+    recordCanvasChange();
+  }
+});
+document.addEventListener('mousemove', () => {
+  if (historyReady && !historyBusy &&
+      (vpadDragging || hpadDragging || dividerDragging ||
+       leftPanel._dragging || rightPanel._dragging)) queuePersist();
+});
+
+let lastPlaybackSave = 0;
+function persistPlayback() {
+  if (!historyReady || historyBusy || !playing || Date.now() - lastPlaybackSave < 2000) return;
+  lastPlaybackSave = Date.now();
+  queuePersist();
+}
+leftPanel.video.addEventListener('timeupdate', persistPlayback);
+rightPanel.video.addEventListener('timeupdate', persistPlayback);
+
+document.body.inert = true;
+async function initializeHistory() {
+  let canPersist = true;
+  try {
+    const saved = await CanvasStorage.loadCurrent();
+    if (saved) {
+      historyBusy = true;
+      await restoreCanvas(saved);
+    }
+  } catch (error) {
+    canPersist = false;
+    canvasError(error);
+  } finally {
+    historyBusy = false;
+    const state = captureCanvas();
+    history = [state];
+    historyKeys = [snapshotKey(state)];
+    historyIndex = 0;
+    historyReady = true;
+    document.body.inert = false;
+    updateHistoryButtons();
+    if (canPersist) queuePersist(state);
+  }
+}
+void initializeHistory();
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('./service-worker.js').catch(console.error));
 }
@@ -1243,19 +1319,20 @@ function roundRect(ctx, x, y, w, h, r) {
 // ── Keyboard ──
 
 document.addEventListener('keydown', (e) => {
-  if (e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey &&
-      (e.code === 'KeyS' || e.code === 'KeyE')) {
+  if (e.metaKey && !e.ctrlKey && !e.altKey &&
+      (e.code === 'KeyZ' || (!e.shiftKey && (e.code === 'KeyS' || e.code === 'KeyE')))) {
     e.preventDefault();
     if (e.repeat || !appDialogOverlay.classList.contains('hidden') ||
-        !document.getElementById('export-overlay').classList.contains('hidden')) return;
-    if (e.code === 'KeyS') btnSave.click();
+        !document.getElementById('export-overlay').classList.contains('hidden') ||
+        !historyReady || historyBusy) return;
+    if (e.code === 'KeyZ') void moveHistory(e.shiftKey ? 1 : -1);
+    else if (e.code === 'KeyS') queuePersist();
     else void exportCanvas();
     return;
   }
   const target = e.target instanceof Element ? e.target : null;
   if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
   if (document.querySelector('.dropdown-menu:not([hidden])')) return;
-  if (!appMenu.hidden) return;
   if (!appDialogOverlay.classList.contains('hidden')) return;
   if (!document.getElementById('export-overlay').classList.contains('hidden')) return;
   if (e.repeat) return;

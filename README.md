@@ -30,13 +30,13 @@ Drop a before & after video (MP4, WebM, MOV) onto each panel to get started.
 - Choose export speed independently from playback speed
 - Videos are rendered at 1920x1080 (960x540 for GIF) at 30fps
 
-**Saved canvases**
-- Open the logo menu to create a new canvas, save the current canvas, or browse recent saves.
-- `⌘S` (macOS) / `⊞S` (Windows) — Save the current canvas when the browser receives the shortcut.
-- **Save** stores a snapshot of the source videos, background image, layout, labels, trim points, playhead positions, playback speed, and export settings in this browser.
-- **Recent saves** reopens or deletes saved snapshots. After the app has loaded once over HTTPS or localhost, saved canvases can be reopened without a network connection.
-- Saved canvases use browser storage on this device and may be removed if site data is cleared or the browser evicts it. Large videos may exceed the browser's storage quota.
-- Windows may handle `⊞S` and `⊞E` before the browser, opening Search or File Explorer instead.
+**Canvas history**
+- Use **New**, **Undo**, and **Redo** in the top toolbar. `⌘Z` / `⌘Shift+Z` on macOS and `⊞Z` / `⊞Shift+Z` on Windows also control history when the browser receives them.
+- Changes to videos, background image, layout, labels, trim points, playhead positions, playback speed, and export settings are saved automatically in this browser. Reloading restores the latest canvas.
+- Each completed timeline or layout drag is one Undo step. Label changes are grouped until typing pauses for 700 ms or the field loses focus.
+- Undo history lasts for the current tab session; after a reload, the restored canvas starts a new history.
+- After the app has loaded once over HTTPS or localhost, the canvas can be reopened without a network connection. Browser storage may be cleared or evicted, and large videos may exceed its quota.
+- Windows may handle `⊞Z` and `⊞E` before the browser.
 
 #### CONTRIBUTING
 There are many ways to contribute, you can

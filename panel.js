@@ -220,6 +220,8 @@ class VideoPanel {
   _onLaneDown(e) {
     if (!this.loaded) return;
     e.preventDefault();
+    this._onLaneLeave();
+    this.onScrubStart?.();
     const ratio = this._xToRatio(e);
     const d = this.duration;
 
@@ -289,10 +291,12 @@ class VideoPanel {
   }
 
   _onLaneUp() {
+    const wasDragging = this._dragging !== null;
     this.handleIn.classList.remove('dragging');
     this.handleOut.classList.remove('dragging');
     this.timelineBar.classList.remove('dragging');
     this._dragging = null;
+    if (wasDragging) this.onScrubEnd?.();
   }
 
   _onLaneHover(e) {

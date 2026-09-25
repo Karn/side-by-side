@@ -18,21 +18,16 @@
 
 <header class="topbar">
   <div class="app-logo">
-    <button id="app-menu-trigger" class="app-logo-trigger" type="button" aria-label="Side-by-Side menu" aria-haspopup="menu" aria-expanded="false" aria-controls="app-menu">
-      <span class="logo-icon">□■</span>
-      <span class="logo-text">SIDE-BY-SIDE</span>
-    </button>
-    <div id="app-menu" class="app-menu" role="menu" aria-label="Canvas actions" hidden>
-      <div class="app-menu-actions" role="group" aria-label="Canvas actions">
-        <button id="btn-new" type="button" role="menuitem" aria-label="New canvas" title="New canvas">New</button>
-        <span class="app-menu-spacer" aria-hidden="true"></span>
-        <button id="btn-save" class="filled" type="button" role="menuitem" title="Save canvas (⌘S)" aria-keyshortcuts="Meta+S"><span class="button-label">Save</span><kbd>⌘S</kbd></button>
-      </div>
-      <div class="app-menu-heading" role="presentation">Recent saves</div>
-      <div class="recent-list" id="recent-list" role="group" aria-label="Recent saves"></div>
-    </div>
+    <span class="logo-icon">□■</span>
+    <span class="logo-text">SIDE-BY-SIDE</span>
   </div>
   <div class="toolbar" role="toolbar" aria-label="Canvas controls">
+    <div class="toolbar-group">
+      <button id="btn-new" type="button" title="New canvas">New</button>
+      <button id="btn-undo" type="button" disabled aria-keyshortcuts="Meta+Z">Undo</button>
+      <button id="btn-redo" type="button" disabled aria-keyshortcuts="Meta+Shift+Z">Redo</button>
+    </div>
+    <span class="toolbar-divider" aria-hidden="true"></span>
     <div class="toolbar-group">
       <select id="layout-frame-select" title="Frame style" aria-label="Frame style">
         <option value="none" selected>No Frame</option>
